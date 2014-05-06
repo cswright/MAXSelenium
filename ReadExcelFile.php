@@ -3,7 +3,7 @@
 error_reporting (E_ALL);
 
 // : Includes
-require_once dirname (__FILE__) . '/Classes/PHPExcel.php';
+require_once 'PHPUnit/Extensions/PHPExcel/Classes/PHPExcel.php';
 
 // : End
 
