@@ -1,13 +1,15 @@
 <?php
-//: Includes
+// : Includes
 require_once ('PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriver.php');
 require_once ('PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriverWait.php');
 require_once ('PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriverBy.php');
 require_once dirname ( __FILE__ ) . '/ReadExcelFile.php';
-require_once dirname(__FILE__) . '/Classes/PHPExcel.php';
-/** PHPExcel_Writer_Excel2007 */
-include dirname(__FILE__) . '/Classes/PHPExcel/Writer/Excel2007.php';
-//: End
+require_once 'PHPUnit/Extensions/PHPExcel/Classes/PHPExcel.php';
+/**
+ * PHPExcel_Writer_Excel2007
+ */
+include 'PHPUnit/Extensions/PHPExcel/Classes/PHPExcel/Writer/Excel2007.php';
+// : End
 
 /**
  * Object::MAXLive_Subcontractors
@@ -38,7 +40,7 @@ class MAXLive_Subcontractors extends PHPUnit_Framework_TestCase {
 	const TEST_SESSION = "firefox";
 	const XLS_CREATOR = "MAXLive_Subcontractors.php";
 	const XLS_TITLE = "Error Report";
-	const XLS_SUBJECT ="Errors caught while creating rates for subcontracts";
+	const XLS_SUBJECT = "Errors caught while creating rates for subcontracts";
 	
 	// : Variables
 	protected static $driver;
@@ -48,17 +50,17 @@ class MAXLive_Subcontractors extends PHPUnit_Framework_TestCase {
 	protected $to = 'clintonabco@gmail.com';
 	protected $subject = 'MAX Selenium script report';
 	protected $message;
-	protected $_error = array();
-	protected $_filename = "Manline Mega-Route and Rates.xls";
-	protected $_xls;
+	protected $_error = array ();
+	protected $_files = array ();
 	protected $_dataDir;
 	protected $_maxurl;
 	protected $_mode;
+	protected $_ip;
 	protected $_username;
 	protected $_password;
 	protected $_welcome;
 	protected $_db;
-	protected $_dbdsn = "mysql:host=192.168.1.43;dbname=max2;charset=utf8;";
+	protected $_dbdsn = "mysql:host=%s;dbname=max2;charset=utf8;";
 	protected $_dbuser = "root";
 	protected $_dbpwd = "kaluma";
 	protected $_dboptions = array (
@@ -99,13 +101,13 @@ class MAXLive_Subcontractors extends PHPUnit_Framework_TestCase {
 			return FALSE;
 		}
 		$data = parse_ini_file ( $ini );
-		if ((array_key_exists ( "dataDir", $data ) && $data ["dataDir"]) && (array_key_exists ( "username", $data ) && $data ["username"]) && (array_key_exists ( "xls", $data ) && $data ["xls"]) && (array_key_exists ( "password", $data ) && $data ["password"]) && (array_key_exists ( "welcome", $data ) && $data ["welcome"]) && (array_key_exists ( "mode", $data ) && $data ["mode"])) {
+		if ((array_key_exists ( "dataDir", $data ) && $data ["dataDir"]) && (array_key_exists ( "ip", $data ) && $data ["ip"]) && (array_key_exists ( "username", $data ) && $data ["username"]) && (array_key_exists ( "password", $data ) && $data ["password"]) && (array_key_exists ( "welcome", $data ) && $data ["welcome"]) && (array_key_exists ( "mode", $data ) && $data ["mode"])) {
 			$this->_username = $data ["username"];
 			$this->_password = $data ["password"];
 			$this->_welcome = $data ["welcome"];
-			$this->_xls = $data ["xls"];
 			$this->_dataDir = $data ["dataDir"];
 			$this->_mode = $data ["mode"];
+			$this->_ip = $data ["ip"];
 			switch ($this->_mode) {
 				case "live" :
 					$this->_maxurl = self::LIVE_URL;
@@ -117,6 +119,24 @@ class MAXLive_Subcontractors extends PHPUnit_Framework_TestCase {
 			echo "The correct data is not present in " . self::INI_FILE . ". Please confirm. Fields are username, password, welcome and mode" . PHP_EOL;
 			return FALSE;
 		}
+		// : Search for xls files in data dir and save into an array
+		$_dir = dirname ( realpath ( __FILE__ ) ) ;
+		$_dir = preg_replace("/\//", self::DS, $_dir);
+		$_dir .= self::DS . $this->_dataDir;
+		$_files = scandir ( $_dir );
+		$_count = ( int ) 0;
+		
+		foreach ( $_files as $_file ) {
+			preg_match ( "/^(.*)\.(.*)$/", $_file, $x );
+			if (count ( $x ) != 0) {
+				if ($x [2] == "xls") {
+					$this->_files [$_count] ["customer"] = $x [1];
+					$this->_files [$_count] ["filename"] = $x [1] . "." . $x [2];
+					$_count ++;
+				}
+			}
+		}
+		// : End
 	}
 	
 	/**
@@ -130,7 +150,7 @@ class MAXLive_Subcontractors extends PHPUnit_Framework_TestCase {
 	// : End
 	public function setUp() {
 		self::$driver = new PHPWebDriver_WebDriver ();
-		$this->_session = self::$driver->session(self::TEST_SESSION);
+		$this->_session = self::$driver->session ( self::TEST_SESSION );
 	}
 	
 	/**
@@ -145,12 +165,10 @@ class MAXLive_Subcontractors extends PHPUnit_Framework_TestCase {
 		
 		// Construct an array with the customer names to use with script
 		$rate_id = ( string ) "";
-		$_customers = ( array ) array (
-				"Lavendon" 
-		);
 		
 		// Connect to database
-		$this->openDB ( $this->_dbdsn, $this->_dbuser, $this->_dbpwd, $this->_dboptions );
+		$_mysqlDsn = preg_replace ( "/%s/", $this->_ip, $this->_dbdsn );
+		$this->openDB ( $_mysqlDsn, $this->_dbuser, $this->_dbpwd, $this->_dboptions );
 		
 		// : Query and save objectregistry_id for udo_subcontractor
 		$myQuery = $this->_myqueries [5];
@@ -158,29 +176,24 @@ class MAXLive_Subcontractors extends PHPUnit_Framework_TestCase {
 		$objectregistry_id = $result [0] ["ID"];
 		// : End
 		
-		// Prepare file path variable
-		$_file = dirname ( __FILE__ ) . $this->_dataDir . DIRECTORY_SEPARATOR . $this->_xls;
-		$_file = preg_replace ( "$\/$", DIRECTORY_SEPARATOR, $_file );
-		
-		if (file_exists ( $_file )) {
-			
-			// : Login
+		// : Login
+		try {
 			$this->_session->open ( $this->_maxurl );
 			// : Wait for page to load and for elements to be present on page
 			if ($this->_mode == "live") {
-			$e = $w->until ( function ($session) {
-				return $session->element ( 'css selector', "#contentFrame" );
-			} );
-			$iframe = $this->_session->element ( 'css selector', '#contentFrame' );
-			$this->_session->switch_to_frame ( $iframe );
+				$e = $w->until ( function ($session) {
+					return $session->element ( 'css selector', "#contentFrame" );
+				} );
+				$iframe = $this->_session->element ( 'css selector', '#contentFrame' );
+				$this->_session->switch_to_frame ( $iframe );
 			}
 			$e = $w->until ( function ($session) {
 				return $session->element ( 'css selector', 'input[id=identification]' );
 			} );
 			// : End
-			$this->assertElementPresent('css selector', 'input[id=identification]');
-			$this->assertElementPresent('css selector', 'input[id=password]');
-			$this->assertElementPresent('css selector', 'input[name=submit][type=submit]');
+			$this->assertElementPresent ( 'css selector', 'input[id=identification]' );
+			$this->assertElementPresent ( 'css selector', 'input[id=password]' );
+			$this->assertElementPresent ( 'css selector', 'input[name=submit][type=submit]' );
 			$e->sendKeys ( $this->_username );
 			$e = $this->_session->element ( 'css selector', 'input[id=password]' );
 			$e->sendKeys ( $this->_password );
@@ -202,31 +215,42 @@ class MAXLive_Subcontractors extends PHPUnit_Framework_TestCase {
 			$e = $w->until ( function ($session) {
 				return $session->element ( "xpath", "//*[text()='" . $this->_welcome . "']" );
 			} );
-			$this->assertElementPresent("xpath", "//*[text()='" . $this->_welcome . "']");
+			$this->assertElementPresent ( "xpath", "//*[text()='" . $this->_welcome . "']" );
 			// Switch out of frame
 			if ($this->_mode == "live") {
 				$this->_session->switch_to_frame ();
 			}
-			// : End
-			
-			// : Load Planningboard to rid of iframe loading on every page from here on
-			$this->_session->open ( $this->_maxurl . self::PB_URL);
-			$e = $w->until ( function ($session) {
-				return $session->element ( "xpath", "//*[contains(text(),'You Are Here') and contains(text(), 'Planningboard')]" );
-			} );
-			// : End
-			
-			foreach ( $_customers as $_customer ) {
+		} catch ( Exception $e ) {
+			throw new Exception ("Something went wrong when attempting to log into MAX, see error message below." . PHP_EOL . $e->getMessage());
+		}
+		// : End
+		
+		// : Load Planningboard to rid of iframe loading on every page from here on
+		$this->_session->open ( $this->_maxurl . self::PB_URL );
+		$e = $w->until ( function ($session) {
+			return $session->element ( "xpath", "//*[contains(text(),'You Are Here') and contains(text(), 'Planningboard')]" );
+		} );
+		// : End
+		
+		foreach ( $this->_files as $_xlsfile ) {
+			$_customer = $_xlsfile ["customer"];
+			// Prepare file path variable
+			$_file = dirname ( __FILE__ ) . $this->_dataDir . DIRECTORY_SEPARATOR . $_xlsfile ["filename"];
+			$_file = preg_replace ( "$\/$", DIRECTORY_SEPARATOR, $_file );
+
+			if (file_exists ( $_file )) {
+				
 				// : Setup variables and data
-				$this->_error = array();
-				$_xlsData = new ReadExcelFile ( $_file, $_customer );
+				$this->_error = array ();
+				echo $_file . PHP_EOL;
+				$_xlsData = new ReadExcelFile ( $_file, "Sheet1" );
 				$_data = $_xlsData->getData ();
 				
 				// : Extract columns from the spreadsheet data
-				$_xlsColumns = array();
-				$_xlsColumns[] = "Error_Msg";
-				foreach ($_data as $key => $value) {
-					$_xlsColumns[] = $key;
+				$_xlsColumns = array ();
+				$_xlsColumns [] = "Error_Msg";
+				foreach ( $_data as $key => $value ) {
+					$_xlsColumns [] = $key;
 				}
 				
 				// : Query and save subcontractor id
@@ -328,7 +352,7 @@ class MAXLive_Subcontractors extends PHPUnit_Framework_TestCase {
 						// : End
 						
 						// : Query database to find if route and rate exists
-						$myQuery = preg_replace ( "/%f/", $_data ["LoadingPoint"] [$x], $this->_myqueries [3] );
+						$myQuery = preg_replace ( "/%f/", $_data ["LocationFrom"] [$x], $this->_myqueries [3] );
 						$myQuery = preg_replace ( "/%t/", $_data ["LocationTo"] [$x], $myQuery );
 						$myQuery = preg_replace ( "/%g/", $objectregistry_id, $myQuery );
 						$myQuery = preg_replace ( "/%c/", $subbie_id, $myQuery );
@@ -348,71 +372,71 @@ class MAXLive_Subcontractors extends PHPUnit_Framework_TestCase {
 							
 							// : Load Subbie page and Create Route
 							// : #1 - Load page and wait an assert element to make sure has loaded
-							$this->_session->open( $this->_maxurl . self::SUBBIE_URL . $subbie_id );
+							$this->_session->open ( $this->_maxurl . self::SUBBIE_URL . $subbie_id );
 							
 							$this->_dummy = $_customer;
 							$e = $w->until ( function ($session) {
-								return $session->element ( "xpath",  "//*[contains(text(),'" . $this->_dummy . "')]" );
+								return $session->element ( "xpath", "//*[contains(text(),'" . $this->_dummy . "')]" );
 							} );
 							// : #1 - End
 							// : #2 - Assert elements are present and load rates page for customer
-							$this->assertElementPresent("xpath", "//*[contains(text(),'" . $_customer . "')]");
-							$this->assertElementPresent('css selector','span#subtabselector');
+							$this->assertElementPresent ( "xpath", "//*[contains(text(),'" . $_customer . "')]" );
+							$this->assertElementPresent ( 'css selector', 'span#subtabselector' );
 							// : #2 - End
 							// : #3 - Select option from selectbox to load rates for customer
-							$this->_session->element("xpath", "//*[@id='subtabselector']/select/option[contains(text(),'Rates for this Customer')]")->click();
+							$this->_session->element ( "xpath", "//*[@id='subtabselector']/select/option[contains(text(),'Rates for this Customer')]" )->click ();
 							$e = $w->until ( function ($session) {
 								return $session->element ( 'css selector', '#subtabselector' );
 							} );
 							// : #3 - End
 							// : #4 - Create new rate
-							$this->assertElementPresent('css selector', '#button-create');
-							$this->_session->element('css selector', '#button-create')->click();
+							$this->assertElementPresent ( 'css selector', '#button-create' );
+							$this->_session->element ( 'css selector', '#button-create' )->click ();
 							$e = $w->until ( function ($session) {
 								return $session->element ( "xpath", "//*[contains(text(),'Capture the details of Rates')]" );
 							} );
-							$this->assertElementPresent('css selector', '#udo_Rates-45__0_provinceFrom_id-45');
-							$this->assertElementPresent('css selector', '#udo_Rates-46__0_cityFrom_id-46');
-							$this->assertElementPresent('css selector', '#udo_Rates-47__0_provinceTo_id-47');
-							$this->assertElementPresent('css selector', '#udo_Rates-48__0_cityTo_id-48');
-							$this->assertElementPresent('css selector', '#udo_Rates-30__0_rateType_id-30');
-							$this->assertElementPresent('css selector', '#udo_Rates-4__0_businessUnit_id-4');
-							$this->assertElementPresent('css selector', '#udo_Rates-36__0_truckDescription_id-36');
-							$this->assertElementPresent('css selector', '#udo_Rates-18_0_0_leadKms-18');
-							$this->assertElementPresent('css selector', '#checkbox_udo_Rates-15_0_0_enabled-15');
-							$this->assertElementPresent('css selector', 'input[name=save][type=submit]');
-							$this->_session->element("xpath", "//*[@id='udo_Rates-45__0_provinceFrom_id-45']/option[contains(text(),'" . $_locations ["LocationFrom"] . "')]")->click();
-							$this->_dummy = $_data ["LoadingPoint"] [$x];
+							$this->assertElementPresent ( 'css selector', '#udo_Rates-45__0_provinceFrom_id-45' );
+							$this->assertElementPresent ( 'css selector', '#udo_Rates-46__0_cityFrom_id-46' );
+							$this->assertElementPresent ( 'css selector', '#udo_Rates-47__0_provinceTo_id-47' );
+							$this->assertElementPresent ( 'css selector', '#udo_Rates-48__0_cityTo_id-48' );
+							$this->assertElementPresent ( 'css selector', '#udo_Rates-30__0_rateType_id-30' );
+							$this->assertElementPresent ( 'css selector', '#udo_Rates-4__0_businessUnit_id-4' );
+							$this->assertElementPresent ( 'css selector', '#udo_Rates-36__0_truckDescription_id-36' );
+							$this->assertElementPresent ( 'css selector', '#udo_Rates-18_0_0_leadKms-18' );
+							$this->assertElementPresent ( 'css selector', '#checkbox_udo_Rates-15_0_0_enabled-15' );
+							$this->assertElementPresent ( 'css selector', 'input[name=save][type=submit]' );
+							$this->_session->element ( "xpath", "//*[@id='udo_Rates-45__0_provinceFrom_id-45']/option[contains(text(),'" . $_locations ["LocationFrom"] . "')]" )->click ();
+							$this->_dummy = $_data ["LocationFrom"] [$x];
 							$e = $w->until ( function ($session) {
 								return $session->element ( "xpath", "//*[@id='udo_Rates-46__0_cityFrom_id-46']/option[text()='" . $this->_dummy . "']" );
 							} );
-							$this->_session->element("xpath", "//*[@id='udo_Rates-46__0_cityFrom_id-46']/option[text()='" . $_data ["LoadingPoint"] [$x] . "']")->click();
-							$this->_session->element("xpath", "//*[@id='udo_Rates-47__0_provinceTo_id-47']/option[contains(text(),'" . $_locations ["LocationTo"] . "')]")->click();
+							$this->_session->element ( "xpath", "//*[@id='udo_Rates-46__0_cityFrom_id-46']/option[text()='" . $_data ["LocationFrom"] [$x] . "']" )->click ();
+							$this->_session->element ( "xpath", "//*[@id='udo_Rates-47__0_provinceTo_id-47']/option[contains(text(),'" . $_locations ["LocationTo"] . "')]" )->click ();
 							$this->_dummy = $_data ["LocationTo"] [$x];
 							$e = $w->until ( function ($session) {
 								return $session->element ( "xpath", "//*[@id='udo_Rates-48__0_cityTo_id-48']/option[text()='" . $this->_dummy . "']" );
 							} );
-							$this->_session->element ( "xpath", "//*[@id='udo_Rates-48__0_cityTo_id-48']/option[text()='" . $_data ["LocationTo"] [$x] . "']" )->click();
-							$this->_dummy = $_data ["LoadingPoint"] [$x] . " TO " . $_data ["LocationTo"] [$x];
+							$this->_session->element ( "xpath", "//*[@id='udo_Rates-48__0_cityTo_id-48']/option[text()='" . $_data ["LocationTo"] [$x] . "']" )->click ();
+							$this->_dummy = $_data ["LocationFrom"] [$x] . " TO " . $_data ["LocationTo"] [$x];
 							$e = $w->until ( function ($session) {
-								return $session->element ( "xpath", "//*[contains(text(),'" . $this->_dummy  . "')]" );
+								return $session->element ( "xpath", "//*[contains(text(),'" . $this->_dummy . "')]" );
 							} );
-							$this->_session->element("xpath", "//*[@id='udo_Rates-30__0_rateType_id-30']/option[text()='" . $_data ["RateType"] [$x] . "']")->click();
-							$this->_session->element("xpath", "//*[@id='udo_Rates-4__0_businessUnit_id-4']/option[text()='" . $_data ["BusinessUnit"] [$x] . "']")->click();
-							$this->_session->element("xpath", "//*[@id='udo_Rates-36__0_truckDescription_id-36']/option[text()='" . $_data ["TruckDescription"] [$x] . "']")->click();
+							$this->_session->element ( "xpath", "//*[@id='udo_Rates-30__0_rateType_id-30']/option[text()='" . $_data ["RateType"] [$x] . "']" )->click ();
+							$this->_session->element ( "xpath", "//*[@id='udo_Rates-4__0_businessUnit_id-4']/option[text()='" . $_data ["BusinessUnit"] [$x] . "']" )->click ();
+							$this->_session->element ( "xpath", "//*[@id='udo_Rates-36__0_truckDescription_id-36']/option[text()='" . $_data ["TruckDescription"] [$x] . "']" )->click ();
 							;
 							if ($_data ["LeadKms"] [$x] != "0") {
-								$this->_session->element('css selector', '#udo_Rates-18_0_0_leadKms-18')->sendKeys($_data ["LeadKms"] [$x]);
+								$this->_session->element ( 'css selector', '#udo_Rates-18_0_0_leadKms-18' )->sendKeys ( $_data ["LeadKms"] [$x] );
 							}
-							$this->_session->element('css selector', '#checkbox_udo_Rates-15_0_0_enabled-15')->click();
-							$this->_session->element('css selector', 'input[name=save][type=submit]')->click();
+							$this->_session->element ( 'css selector', '#checkbox_udo_Rates-15_0_0_enabled-15' )->click ();
+							$this->_session->element ( 'css selector', 'input[name=save][type=submit]' )->click ();
 							$e = $w->until ( function ($session) {
 								return $session->element ( 'css selector', '#subtabselector' );
 							} );
 							// : End
 							
 							// : Query database to find newly created route to create a daterangevalue rate for the route
-							$myQuery = preg_replace ( "/%f/", $_data ["LoadingPoint"] [$x], $this->_myqueries [3] );
+							$myQuery = preg_replace ( "/%f/", $_data ["LocationFrom"] [$x], $this->_myqueries [3] );
 							$myQuery = preg_replace ( "/%t/", $_data ["LocationTo"] [$x], $myQuery );
 							$myQuery = preg_replace ( "/%g/", $objectregistry_id, $myQuery );
 							$myQuery = preg_replace ( "/%c/", $subbie_id, $myQuery );
@@ -430,49 +454,49 @@ class MAXLive_Subcontractors extends PHPUnit_Framework_TestCase {
 						}
 						
 						if ($rate_id != NULL) {
-							$rateurl = preg_replace ( "/%s/", $rate_id, $this->_maxurl. self::RATEVAL_URL );
-							$this->_session->open( $rateurl );
+							$rateurl = preg_replace ( "/%s/", $rate_id, $this->_maxurl . self::RATEVAL_URL );
+							$this->_session->open ( $rateurl );
 							$e = $w->until ( function ($session) {
 								return $session->element ( 'css selector', '#subtabselector' );
 							} );
-							$this->assertElementPresent('css selector', '#button-create');
-							$this->_session->element('css selector', '#button-create')->click();
+							$this->assertElementPresent ( 'css selector', '#button-create' );
+							$this->_session->element ( 'css selector', '#button-create' )->click ();
 							$e = $w->until ( function ($session) {
 								return $session->element ( "xpath", "//*[contains(text(),'Create Date Range Values')]" );
 							} );
 							
-							$this->assertElementPresent('css selector', '#DateRangeValue-2_0_0_beginDate-2');
-							$this->assertElementPresent('css selector', '#DateRangeValue-20_0_0_value-20');
-							$this->assertElementPresent('css selector', 'input[name=save][type=submit]');
+							$this->assertElementPresent ( 'css selector', '#DateRangeValue-2_0_0_beginDate-2' );
+							$this->assertElementPresent ( 'css selector', '#DateRangeValue-20_0_0_value-20' );
+							$this->assertElementPresent ( 'css selector', 'input[name=save][type=submit]' );
 							
-							$this->_session->element('css selector', '#DateRangeValue-2_0_0_beginDate-2')->clear();
-							$this->_session->element('css selector', '#DateRangeValue-20_0_0_value-20')->clear();
-							$this->_session->element('css selector', '#DateRangeValue-2_0_0_beginDate-2')->sendKeys(date ( "Y-m-01 00:00:00", strtotime ( "-1 month" ) ) );
-							$this->_session->element('css selector', '#DateRangeValue-20_0_0_value-20')->sendKeys( strval ($_data ["Rate"] [$x]) );
-							$this->_session->element('css selector', 'input[name=save][type=submit]')->click();
+							$this->_session->element ( 'css selector', '#DateRangeValue-2_0_0_beginDate-2' )->clear ();
+							$this->_session->element ( 'css selector', '#DateRangeValue-20_0_0_value-20' )->clear ();
+							$this->_session->element ( 'css selector', '#DateRangeValue-2_0_0_beginDate-2' )->sendKeys ( date ( "Y-m-01 00:00:00", strtotime ( "-1 month" ) ) );
+							$this->_session->element ( 'css selector', '#DateRangeValue-20_0_0_value-20' )->sendKeys ( strval ( $_data ["Rate"] [$x] ) );
+							$this->_session->element ( 'css selector', 'input[name=save][type=submit]' )->click ();
 						}
 						// : End
 					} catch ( Exception $e ) {
 						echo "Error: " . $e->getMessage () . PHP_EOL;
 						echo "Time of error: " . date ( "Y-m-d H:i:s" ) . PHP_EOL;
 						echo "Last record: " . $this->lastRecord;
-						$this->takeScreenshot();
-						$_erCount = count($this->_error);
-						$this->_error[$_erCount + 1]["error"] = $e->getMessage();
-						foreach ($_data as $key => $value) {
-							$this->_error[$_erCount + 1][$key] = $value[$x];
+						$this->takeScreenshot ();
+						$_erCount = count ( $this->_error );
+						$this->_error [$_erCount + 1] ["error"] = $e->getMessage ();
+						foreach ( $_data as $key => $value ) {
+							$this->_error [$_erCount + 1] [$key] = $value [$x];
 						}
 					}
 				}
 				
 				// : If errors occured. Create xls of entries that failed.
-				if (count($this->_error) != 0) {
-					$_xlsfilename = (dirname(__FILE__) . self::DS . "error_reports" . self::DS . date("Y-m-d_His_") . "MAXLiveSubbies_" . $_customer . ".xlsx");
-					$this->writeExcelFile($_xlsfilename, $this->_error, $_xlsColumns);
-					if (file_exists($_xlsfilename)) {
-						print("Excel error report written successfully to file: $_xlsfilename");
+				if (count ( $this->_error ) != 0) {
+					$_xlsfilename = (dirname ( __FILE__ ) . self::DS . "error_reports" . self::DS . date ( "Y-m-d_His_" ) . "MAXLiveSubbies_" . $_customer . ".xlsx");
+					$this->writeExcelFile ( $_xlsfilename, $this->_error, $_xlsColumns );
+					if (file_exists ( $_xlsfilename )) {
+						print ("Excel error report written successfully to file: $_xlsfilename") ;
 					} else {
-						print("Excel error report write unsuccessful");
+						print ("Excel error report write unsuccessful") ;
 					}
 				}
 				// : End
@@ -480,107 +504,109 @@ class MAXLive_Subcontractors extends PHPUnit_Framework_TestCase {
 		}
 		
 		// : Tear Down
-		$this->_session->element ( 'xpath', "//*[contains(@href,'/logout')]" )->click();
+		$this->_session->element ( 'xpath', "//*[contains(@href,'/logout')]" )->click ();
 		// Wait for page to load and for elements to be present on page
 		$e = $w->until ( function ($session) {
 			return $session->element ( 'css selector', 'input[id=identification]' );
 		} );
-		$this->assertElementPresent('css selector', 'input[id=identification]');
+		$this->assertElementPresent ( 'css selector', 'input[id=identification]' );
 		$this->_session->close ();
 		// : End
 	}
 	
 	// : Private Functions
 	
-	/** MAXLive_Subcontractors::writeExcelFile($excelFile, $excelData)
-	 *  Create, Write and Save Excel Spreadsheet from collected data obtained from the variance report
-	 *  @param $excelFile, $excelData
+	/**
+	 * MAXLive_Subcontractors::writeExcelFile($excelFile, $excelData)
+	 * Create, Write and Save Excel Spreadsheet from collected data obtained from the variance report
+	 *
+	 * @param $excelFile, $excelData        	
 	 */
 	public function writeExcelFile($excelFile, $excelData, $columns) {
 		try {
 			// Check data validility
-			if (count($excelData) <> 0) {
-	
-				//: Create new PHPExcel object
-				print("<pre>");
-				print(date('H:i:s') . " Create new PHPExcel object" . PHP_EOL);
-				$objPHPExcel = new PHPExcel();
-				//: End
-	
-				//: Set properties
-				print(date('H:i:s') . " Set properties" . PHP_EOL);
-				$objPHPExcel->getProperties()->setCreator(self::XLS_CREATOR);
-				$objPHPExcel->getProperties()->setLastModifiedBy(self::XLS_CREATOR);
-				$objPHPExcel->getProperties()->setTitle(self::XLS_TITLE);
-				$objPHPExcel->getProperties()->setSubject(self::XLS_SUBJECT);
-				//: End
-	
-				//: Setup Workbook Preferences
-				print(date('H:i:s') . " Setup workbook preferences" . PHP_EOL);
-				$objPHPExcel->getDefaultStyle()->getFont()->setName('Arial');
-				$objPHPExcel->getDefaultStyle()->getFont()->setSize(8);
-				$objPHPExcel->getActiveSheet()->getPageSetup()->setOrientation(PHPExcel_Worksheet_PageSetup::ORIENTATION_LANDSCAPE);
-				$objPHPExcel->getActiveSheet()->getPageSetup()->setPaperSize(PHPExcel_Worksheet_PageSetup::PAPERSIZE_A4);
-				$objPHPExcel->getActiveSheet()->getPageSetup()->setFitToWidth(1);
-				$objPHPExcel->getActiveSheet()->getPageSetup()->setFitToHeight(0);
-				//: End
-	
-				//: Set Column Headers
-				$alphaVar = range('A', 'Z');
-				print(date('H:i:s') . " Setup column headers" . PHP_EOL);
-	
+			if (count ( $excelData ) != 0) {
+				
+				// : Create new PHPExcel object
+				print ("<pre>") ;
+				print (date ( 'H:i:s' ) . " Create new PHPExcel object" . PHP_EOL) ;
+				$objPHPExcel = new PHPExcel ();
+				// : End
+				
+				// : Set properties
+				print (date ( 'H:i:s' ) . " Set properties" . PHP_EOL) ;
+				$objPHPExcel->getProperties ()->setCreator ( self::XLS_CREATOR );
+				$objPHPExcel->getProperties ()->setLastModifiedBy ( self::XLS_CREATOR );
+				$objPHPExcel->getProperties ()->setTitle ( self::XLS_TITLE );
+				$objPHPExcel->getProperties ()->setSubject ( self::XLS_SUBJECT );
+				// : End
+				
+				// : Setup Workbook Preferences
+				print (date ( 'H:i:s' ) . " Setup workbook preferences" . PHP_EOL) ;
+				$objPHPExcel->getDefaultStyle ()->getFont ()->setName ( 'Arial' );
+				$objPHPExcel->getDefaultStyle ()->getFont ()->setSize ( 8 );
+				$objPHPExcel->getActiveSheet ()->getPageSetup ()->setOrientation ( PHPExcel_Worksheet_PageSetup::ORIENTATION_LANDSCAPE );
+				$objPHPExcel->getActiveSheet ()->getPageSetup ()->setPaperSize ( PHPExcel_Worksheet_PageSetup::PAPERSIZE_A4 );
+				$objPHPExcel->getActiveSheet ()->getPageSetup ()->setFitToWidth ( 1 );
+				$objPHPExcel->getActiveSheet ()->getPageSetup ()->setFitToHeight ( 0 );
+				// : End
+				
+				// : Set Column Headers
+				$alphaVar = range ( 'A', 'Z' );
+				print (date ( 'H:i:s' ) . " Setup column headers" . PHP_EOL) ;
+				
 				$i = 0;
-				foreach ($columns as $key) {
-					$objPHPExcel->getActiveSheet()->setCellValue($alphaVar[$i] . "1", $key);
-					$objPHPExcel->getActiveSheet()->getStyle($alphaVar[$i] . '1')->getFont()->setBold(true);
-					$i++;
+				foreach ( $columns as $key ) {
+					$objPHPExcel->getActiveSheet ()->setCellValue ( $alphaVar [$i] . "1", $key );
+					$objPHPExcel->getActiveSheet ()->getStyle ( $alphaVar [$i] . '1' )->getFont ()->setBold ( true );
+					$i ++;
 				}
 				
-				//: End
-	
-				//: Add data from $excelData array
-				print(date('H:i:s') . " Add data from error array" . PHP_EOL);
-				$rowCount = (int)2;
-				$objPHPExcel->setActiveSheetIndex(0);
-				foreach($excelData as $values) {
+				// : End
+				
+				// : Add data from $excelData array
+				print (date ( 'H:i:s' ) . " Add data from error array" . PHP_EOL) ;
+				$rowCount = ( int ) 2;
+				$objPHPExcel->setActiveSheetIndex ( 0 );
+				foreach ( $excelData as $values ) {
 					$i = 0;
-					foreach($values as $key => $value) {
-						$objPHPExcel->getActiveSheet()->getCell($alphaVar[$i] . strval($rowCount))->setValueExplicit($value, PHPExcel_Cell_DataType::TYPE_STRING);
-						$i++;
+					foreach ( $values as $key => $value ) {
+						$objPHPExcel->getActiveSheet ()->getCell ( $alphaVar [$i] . strval ( $rowCount ) )->setValueExplicit ( $value, PHPExcel_Cell_DataType::TYPE_STRING );
+						$i ++;
 					}
-					$rowCount++;
+					$rowCount ++;
 				}
-				//: End
-	
-				//: Setup Column Widths
-				for ($i = 0; $i <= count($columns); $i++) {
-				$objPHPExcel->getActiveSheet()->getColumnDimension($alphaVar[$i])->setAutoSize(true);
+				// : End
+				
+				// : Setup Column Widths
+				for($i = 0; $i <= count ( $columns ); $i ++) {
+					$objPHPExcel->getActiveSheet ()->getColumnDimension ( $alphaVar [$i] )->setAutoSize ( true );
 				}
-				//: End
-	
-				//: Rename sheet
-				print(date('H:i:s') . " Rename sheet" . PHP_EOL);
-				$objPHPExcel->getActiveSheet()->setTitle(self::XLS_TITLE);
-						//: End
-	
-						//: Save spreadsheet to Excel 2007 file format
-						print(date('H:i:s') . " Write to Excel2007 format" . PHP_EOL);
-						print("</pre>" . PHP_EOL);
-						$objWriter = new PHPExcel_Writer_Excel2007($objPHPExcel);
-						$objWriter->save($excelFile);
-						$objPHPExcel->disconnectWorksheets();
-						unset($objPHPExcel);
-						unset($objWriter);
-						//: End
+				// : End
+				
+				// : Rename sheet
+				print (date ( 'H:i:s' ) . " Rename sheet" . PHP_EOL) ;
+				$objPHPExcel->getActiveSheet ()->setTitle ( self::XLS_TITLE );
+				// : End
+				
+				// : Save spreadsheet to Excel 2007 file format
+				print (date ( 'H:i:s' ) . " Write to Excel2007 format" . PHP_EOL) ;
+				print ("</pre>" . PHP_EOL) ;
+				$objWriter = new PHPExcel_Writer_Excel2007 ( $objPHPExcel );
+				$objWriter->save ( $excelFile );
+				$objPHPExcel->disconnectWorksheets ();
+				unset ( $objPHPExcel );
+				unset ( $objWriter );
+				// : End
 			} else {
-				print("<pre>");
-				print_r("ERROR: The function was passed an empty array");
-				print("</pre>");
-				exit;
+				print ("<pre>") ;
+				print_r ( "ERROR: The function was passed an empty array" );
+				print ("</pre>") ;
+				exit ();
 			}
-		} catch (Exception $e) {
-			echo "Caught exception: ",  $e->getMessage(), "\n";
-			exit;
+		} catch ( Exception $e ) {
+			echo "Caught exception: ", $e->getMessage (), "\n";
+			exit ();
 		}
 	}
 	
@@ -606,22 +632,22 @@ class MAXLive_Subcontractors extends PHPUnit_Framework_TestCase {
 	 * MAXLive_Subcontractors::assertElementPresent($_using, $_value)
 	 * This is a function description for a selenium test function
 	 *
-	 * @param string: $_using
-	 * @param string: $_value
+	 * @param string: $_using        	
+	 * @param string: $_value        	
 	 */
 	private function assertElementPresent($_using, $_value) {
-		$e = $this->_session->element($_using, $_value);
-		$this->assertEquals(count($e), 1);
+		$e = $this->_session->element ( $_using, $_value );
+		$this->assertEquals ( count ( $e ), 1 );
 	}
 	
 	/**
 	 * MAXLive_Subcontractors::openDB($dsn, $username, $password, $options)
 	 * Open connection to Database
 	 *
-	 * @param string: $dsn
-	 * @param string: $username
-	 * @param string: $password
-	 * @param array: $options
+	 * @param string: $dsn        	
+	 * @param string: $username        	
+	 * @param string: $password        	
+	 * @param array: $options        	
 	 */
 	private function openDB($dsn, $username, $password, $options) {
 		try {
@@ -643,8 +669,8 @@ class MAXLive_Subcontractors extends PHPUnit_Framework_TestCase {
 	 * MAXLive_Subcontractors::queryDB($sqlquery)
 	 * Pass MySQL Query to database and return output
 	 *
-	 * @param string: $sqlquery
-	 * @param array: $result
+	 * @param string: $sqlquery        	
+	 * @param array: $result        	
 	 */
 	private function queryDB($sqlquery) {
 		try {
