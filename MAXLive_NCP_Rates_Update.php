@@ -85,16 +85,16 @@ class MAXLive_NCP_Rates_Update extends PHPUnit_Framework_TestCase {
 			return FALSE;
 		}
 		$data = parse_ini_file ( $ini );
-		if ((array_key_exists ( "errordir", $data ) && $data ["errordir"]) && (array_key_exists ( "screenshotdir", $data ) && $data ["screenshotdir"]) && (array_key_exists ( "datadir", $data ) && $data ["datadir"]) && (array_key_exists ( "ip", $data ) && $data ["ip"]) && (array_key_exists ( "username", $data ) && $data ["username"]) && (array_key_exists ( "xls", $data ) && $data ["xls"]) && (array_key_exists ( "password", $data ) && $data ["password"]) && (array_key_exists ( "welcome", $data ) && $data ["welcome"]) && (array_key_exists ( "mode", $data ) && $data ["mode"])) {
+		if ((array_key_exists ( "xls", $data ) && $data ["xls"]) && (array_key_exists ( "errordir", $data ) && $data ["errordir"]) && (array_key_exists ( "screenshotdir", $data ) && $data ["screenshotdir"]) && (array_key_exists ( "datadir", $data ) && $data ["datadir"]) && (array_key_exists ( "ip", $data ) && $data ["ip"]) && (array_key_exists ( "username", $data ) && $data ["username"]) && (array_key_exists ( "password", $data ) && $data ["password"]) && (array_key_exists ( "welcome", $data ) && $data ["welcome"]) && (array_key_exists ( "mode", $data ) && $data ["mode"])) {
 			$this->_username = $data ["username"];
 			$this->_password = $data ["password"];
 			$this->_welcome = $data ["welcome"];
-			$this->_xls = $data ["xls"];
 			$this->_dataDir = $data ["datadir"];
 			$this->_errDir = $data ["errordir"];
 			$this->_scrDir = $data ["screenshotdir"];
 			$this->_mode = $data ["mode"];
 			$this->_ip = $data ["ip"];
+			$this->_xls = $data ["xls"];
 			switch ($this->_mode) {
 				case "live" :
 					$this->_maxurl = self::LIVE_URL;
@@ -106,22 +106,6 @@ class MAXLive_NCP_Rates_Update extends PHPUnit_Framework_TestCase {
 			echo "The correct data is not present in " . self::INI_FILE . ". Please confirm. Fields are username, password, welcome and mode" . PHP_EOL;
 			return FALSE;
 		}
-		// : Search for xls files in data dir and save into an array
-		$_dir = dirname ( realpath ( __FILE__ ) . $dataDir );
-		$_files = scandir ( $_dir );
-		$_count = ( int ) 0;
-		
-		foreach ( $_files as $_file ) {
-			preg_match ( "/^(.*)\.(.*)$/", $_file, $x );
-			if (count ( $x ) != 0) {
-				if ($x [2] == "xls") {
-					$this->_files [$_count] ["customer"] = $x [1];
-					$this->_files [$_count] ["filename"] = $x [1] . "." . $x [2];
-					$_count ++;
-				}
-			}
-		}
-		// : End
 	}
 	
 	/**
@@ -148,13 +132,16 @@ class MAXLive_NCP_Rates_Update extends PHPUnit_Framework_TestCase {
 	 * Pull F and V Contract data and automate creation of F and V Contracts
 	 */
 	public function testCreateContracts() {
-		foreach ( $this->_files as $_xlsfile ) {
-			// : Pull data from correctly formatted xls spreadsheet
-			$cPR = new RatesReadXLSData ( dirname ( __FILE__ ) . self::DS . "Data" . self::DS . $_xlsfile );
-			$cities = $cPR->getCities (); // : Get cities and save in correct naming format standard as per Meryle instruction
-			$points = $cPR->getPoints (); // : Store points
-			$products = $cPR->getProducts (); // : Store products
-			$routes = $cPR->getRoutes (); // : Store routes and rates
+		// : Pull data from correctly formatted xls spreadsheet
+		if ($cPR = new RatesReadXLSData ( dirname ( __FILE__ ) . self::DS . "Data" . self::DS . $this->_xls )) {
+			// Get cities and save in correct naming format standard as per Meryle instruction
+			$cities = $cPR->getCities (); 
+			// Store points
+			$points = $cPR->getPoints (); 
+			// Store products
+			$products = $cPR->getProducts ();
+			// Store routes and rates
+			$routes = $cPR->getRoutes (); 
 			
 			try {
 				// : Connect to database
@@ -181,8 +168,8 @@ class MAXLive_NCP_Rates_Update extends PHPUnit_Framework_TestCase {
 				$result = $this->queryDB ( $myQuery );
 				
 				// Store objectregistry_id for udo_Customer
-				$objectregistry_id = $result [0] ["ID"]; 
-				                                        
+				$objectregistry_id = $result [0] ["ID"];
+				
 				// : Login
 				$this->set_implicit_wait ( 15000 );
 				$this->load ( $this->_maxurl . "/home" );
@@ -455,8 +442,11 @@ class MAXLive_NCP_Rates_Update extends PHPUnit_Framework_TestCase {
 				$db = null;
 				$this->TakeScreenshot ();
 			}
+			// : End
 		}
-		// : End
+		else {
+			print("Error: The excel spreadsheet, '" . $this->_xls . "', failed to load." . PHP_EOL);
+		}
 	}
 	
 	/**
