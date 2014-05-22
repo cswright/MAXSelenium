@@ -491,6 +491,14 @@ class MAXLive_NCP_Rates_Update extends PHPUnit_Framework_TestCase {
 						// Select Rates from the select box
 						$this->_session->element ( "xpath", "//*[@id='subtabselector']/select/option[text()='Rates']" )->click ();
 						
+						$myQuery = "select name from udo_location where ID IN (select parent_id from udo_location where name='" . $points [1] ["LocationFrom"] . "');";
+						$result = $this->queryDB ( $myQuery );
+						if (count($result) != 0) {
+							$locationFrom_id = $result [0] ["name"];
+						} else {
+							$locationFrom_id = $points [1] ["LocationFrom"];
+						}
+						
 						$pointname = preg_replace ( "/–/", "-", $pointname );
 						if ($this->_modeUpdates == "false") {
 							// Wait for element = #button-create
@@ -520,9 +528,6 @@ class MAXLive_NCP_Rates_Update extends PHPUnit_Framework_TestCase {
 							$this->assertElementPresent ( "xpath", "//*[@id='udo_Route-3_0_0_duration-3']" );
 							$this->assertElementPresent ( "css selector", "input[type=submit][name=save]" );
 							
-							$myQuery = "select name from udo_location where ID IN (select parent_id from udo_location where name='" . $points [1] ["LocationFrom"] . "');";
-							$result = $this->queryDB ( $myQuery );
-							$locationFrom_id = $result [0] ["name"];
 							try {
 								$this->_session->element ( "xpath", "//*[@id='udo_Route-6__0_locationFrom_id-6']/option[text()=' . $locationFrom_id . ']" )->click ();
 							} catch ( Exception $e ) {
