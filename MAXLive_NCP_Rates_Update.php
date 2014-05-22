@@ -379,7 +379,7 @@ class MAXLive_NCP_Rates_Update extends PHPUnit_Framework_TestCase {
 						$e = $w->until ( function ($session) {
 							return $session->element ( "css selector", "#subtabselector" );
 						} );
-						$this->_session->element ( "//*[@id='subtabselector']/select/option[text()='Offloading Customers where Customer is " . self::CUSTOMER . "']" )->click ();
+						$this->_session->element ( "xpath", "//*[@id='subtabselector']/select/option[text()='Offloading Customers where Customer is " . self::CUSTOMER . "']" )->click ();
 						
 						// Wait for element = Page heading
 						$e = $w->until ( function ($session) {
@@ -439,7 +439,7 @@ class MAXLive_NCP_Rates_Update extends PHPUnit_Framework_TestCase {
 						$e = $w->until ( function ($session) {
 							return $session->element ( "css selector", "#subtabselector" );
 						} );
-						$this->_session->element ( "//*[@id='subtabselector']/select/option[text()='Offloading Customers - Business Unit']" );
+						$this->_session->element ("xpath", "//*[@id='subtabselector']/select/option[text()='Offloading Customers - Business Unit']" );
 						
 						// Wait for element = #button-create
 						$e = $w->until ( function ($session) {
@@ -485,7 +485,7 @@ class MAXLive_NCP_Rates_Update extends PHPUnit_Framework_TestCase {
 						return $session->element ( "css selector", "#subtabselector" );
 					} );
 					// Select Rates from the select box
-					$this->_session->element ( "//*[@id='subtabselector']/select/option[text()='Rates']" )->click ();
+					$this->_session->element ( "xpath", "//*[@id='subtabselector']/select/option[text()='Rates']" )->click ();
 					
 					$pointname = preg_replace ( "/–/", "-", $pointname );
 					if ($this->_modeUpdates == "false") {
@@ -540,7 +540,7 @@ class MAXLive_NCP_Rates_Update extends PHPUnit_Framework_TestCase {
 						return $session->element ( "xpath", "//*[contains(text(),'Capture the details of Rates')]" );
 					} );
 					
-					$this->assertElementPresent ( "xpath", "//*[@id='udo_Rates-31__0_route_id-31']" );
+					$this->assertElementPresent ( "xpath", "//*[@id='udo_Rates-31__0_route_id-31']" );	
 					$this->assertElementPresent ( "xpath", "//*[@id='udo_Rates-30__0_rateType_id-30']" );
 					$this->assertElementPresent ( "xpath", "//*[@id='udo_Rates-4__0_businessUnit_id-4']" );
 					$this->assertElementPresent ( "xpath", "//*[@id='udo_Rates-36__0_truckDescription_id-36']" );
