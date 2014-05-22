@@ -3,7 +3,7 @@
 error_reporting (E_ALL);
 
 // : Includes
-require_once dirname (__FILE__) . '/Classes/PHPExcel.php';
+include_once 'PHPUnit/Extensions/PHPExcel/Classes/PHPExcel.php';
 
 // : End
 
@@ -122,6 +122,22 @@ class RatesReadXLSData {
 		}
 		return $cities;
 	}
+	
+	/**
+	 * RatesReadXLSData::getSettings()
+	 * Return array from supplied array with script data only
+	 *
+	 * @param array: $this->getData()
+	 * @param array: $_settings
+	 */
+	public function getSettings() {
+		$_data = $this->getData();
+		$_settings = array();
+		foreach ($_data["Script"] as $_setting) {
+			$_settings[$_setting[1]] = $_setting[2];
+		}
+		return $_settings;
+	}
 
 	/**
 	 * RatesReadXLSData::getProducts()
@@ -220,17 +236,16 @@ class RatesReadXLSData {
 	 * RatesReadXLSData::__construct()
 	 * Class constructor
 	 */
-	public function __construct($file) {
+	public function __construct($file, $sheetnames) {
 		// Check if file exists
 		if (!file_exists($file)) {
 			$this->_errors[] = preg_replace('/%s/', $file, self::FILE_DOESNT_EXIST);
 		} else {
 			$this->setFileName($file);
 			// Type cast an array to store the sheet names to pass to the read excel sheet function
-			$sheets = (array) array("Points","Rates");
 			try {
 				// Load spreadsheet into memory
-				$this->setData($this->readExcelFile($this->getFileName(), $sheets));
+				$this->setData($this->readExcelFile($this->getFileName(), $sheetnames));
 			} catch(Exception $e) {
 				$this->_errors[] = $e->getMessage();
 			}
