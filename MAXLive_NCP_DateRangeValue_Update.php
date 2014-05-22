@@ -13,7 +13,7 @@ include 'PHPUnit/Extensions/PHPExcel/Classes/PHPExcel/Writer/Excel2007.php';
  *
  * @author Clinton Wright
  * @author cwright@bwtsgroup.com
- * @copyright 2011 onwards Manline Group (Pty) Ltd
+ * @copyright 2011 onwards Barloworld Transport Solutions (Pty) Ltd
  * @license GNU GPL
  * @see http://www.gnu.org/copyleft/gpl.html
  */
@@ -146,7 +146,7 @@ class MAXLive_NCP_DateRangeValue_Update extends PHPUnit_Framework_TestCase {
 	public function testCreateContracts() {
 		
 		// : Pull data from correctly formatted xls spreadsheet
-		$_file = dirname ( __FILE__ ) . self::DS . "Data" . self::DS . $this->_xls;
+		$_file = dirname ( __FILE__ ) . $this->_dataDir . self::DS . $this->_xls;
 		if (file_exists ( $_file )) {
 			$_xlsData = new ReadExcelFile ( $_file, "Sheet1" );
 			$_data = $_xlsData->getData ();
@@ -231,10 +231,10 @@ class MAXLive_NCP_DateRangeValue_Update extends PHPUnit_Framework_TestCase {
 					// : Create Rate Value for Route
 					
 					// Run SQL Query to check that DateRangeValue exists
-					$myQuery = "SELECT ID FROM daterangevalue WHERE ID=" . $data ["ID"] [$x] . ";";
+					$myQuery = "SELECT ID FROM daterangevalue WHERE ID=" . $_data ["ID"] [$x] . ";";
 					$result = $this->queryDB ( $myQuery );
 					if (count ( $result ) != 0) {
-						$this->_session->open ( $this->_maxurl . self::DRV_URL . $data ["ID"] [$x] );
+						$this->_session->open ( $this->_maxurl . self::DRV_URL . $_data ["ID"] [$x] );
 						
 						// Wait for element = .toolbar-cell-update
 						$e = $w->until ( function ($session) {
@@ -254,7 +254,7 @@ class MAXLive_NCP_DateRangeValue_Update extends PHPUnit_Framework_TestCase {
 						$this->assertElementPresent ( "css selector", "input[type=submit][name=save]" );
 						
 						$this->_session->element ( "xpath", "//*[@id='DateRangeValue-4_0_0_endDate-4']" )->clear ();
-						$this->_session->element ( "xpath", "//*[@id='DateRangeValue-4_0_0_endDate-4']" )->sendKeys ( $data ["endDate"] [$x] );
+						$this->_session->element ( "xpath", "//*[@id='DateRangeValue-4_0_0_endDate-4']" )->sendKeys ( $_data ["endDate"] [$x] );
 						$this->_session->element ( "css selector", "input[type=submit][name=save]" )->click ();
 						
 						// Wait for element = .toolbar-cell-update
@@ -262,7 +262,7 @@ class MAXLive_NCP_DateRangeValue_Update extends PHPUnit_Framework_TestCase {
 							return $session->element ( "css selector", ".toolbar-cell-update" );
 						} );
 					} else {
-						throw new Exception ("Error: Rate date range value with ID: " . $data ["ID"] [$x] . " does not exist.");
+						throw new Exception ("Error: Rate date range value with ID: " . $_data ["ID"] [$x] . " does not exist.");
 					}
 				} catch ( Exception $e ) {
 					echo "Error: " . $e->getMessage () . PHP_EOL;
