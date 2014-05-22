@@ -262,9 +262,7 @@ class MAXLive_NCP_DateRangeValue_Update extends PHPUnit_Framework_TestCase {
 							return $session->element ( "css selector", ".toolbar-cell-update" );
 						} );
 					} else {
-						$_erCount = count ( $this->_error );
-						$this->_error [$_erCount + 1] ["error"] = $e->getMessage ();
-						$this->_error [$_erCount + 1] ["record"] = $this->lastRecord;
+						throw new Exception ("Error: Rate date range value with ID: " . $data ["ID"] [$x] . " does not exist.");
 					}
 				} catch ( Exception $e ) {
 					echo "Error: " . $e->getMessage () . PHP_EOL;
