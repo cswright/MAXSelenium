@@ -1,10 +1,10 @@
 <?php
 // : Includes
-require_once ('PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriver.php');
-require_once ('PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriverWait.php');
-require_once ('PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriverBy.php');
-require_once dirname ( __FILE__ ) . '/ReadExcelFile.php';
-require_once 'PHPUnit/Extensions/PHPExcel/Classes/PHPExcel.php';
+include_once ('PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriver.php');
+include_once ('PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriverWait.php');
+include_once ('PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriverBy.php');
+include_once dirname ( __FILE__ ) . '/ReadExcelFile.php';
+include_once 'PHPUnit/Extensions/PHPExcel/Classes/PHPExcel.php';
 /**
  * PHPExcel_Writer_Excel2007
  */
@@ -16,7 +16,7 @@ include 'PHPUnit/Extensions/PHPExcel/Classes/PHPExcel/Writer/Excel2007.php';
  *
  * @author Clinton Wright
  * @author cwright@bwtsgroup.com
- * @copyright 2011 onwards Manline Group (Pty) Ltd
+ * @copyright 2011 onwards Barloworld Transport Solutions (Pty) Ltd
  * @license GNU GPL
  * @see http://www.gnu.org/copyleft/gpl.html
  */
