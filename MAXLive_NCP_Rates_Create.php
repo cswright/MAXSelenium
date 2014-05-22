@@ -10,7 +10,7 @@ include_once 'PHPUnit/Extensions/PHPExcel/Classes/PHPExcel.php';
  *
  * @author Clinton Wright
  * @author cwright@bwtsgroup.com
- * @copyright 2011 onwards Manline Group (Pty) Ltd
+ * @copyright 2011 onwards Barloworld Transport Solutions (Pty) Ltd
  * @license GNU GPL
  * @see http://www.gnu.org/copyleft/gpl.html
  */
