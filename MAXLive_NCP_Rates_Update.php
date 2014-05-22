@@ -570,6 +570,7 @@ class MAXLive_NCP_Rates_Update extends PHPUnit_Framework_TestCase {
 					$myQuery = preg_replace ( "/%b/", $bunit_id, $myQuery );
 					$myQuery = preg_replace ( "/%r/", $rateType_id, $myQuery );
 					$result = $this->queryDB ( $myQuery );
+					if (count($result) != 0) {
 					$rate_id = $result [0] ["ID"];
 					$rateurl = preg_replace ( "/%s/", $rate_id, $this->_maxurl . self::RATEVAL_URL );
 					$this->_session->open ( $rateurl );
@@ -598,6 +599,10 @@ class MAXLive_NCP_Rates_Update extends PHPUnit_Framework_TestCase {
 					$this->_session->element ( "css selector", "input[type=submit][name=save]" )->click ();
 					
 					sleep(2);
+					}
+					else {
+						throw new Exception("Rates record not found");
+					}
 				}
 			}
 				// : End
