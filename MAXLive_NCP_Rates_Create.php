@@ -316,9 +316,9 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 						
 						try {
 							
-							$recordExits = TRUE;
+							$recordExists = TRUE;
 							$pointname = preg_replace ( "/–/", "-", $pointname );
-							$this->lastRecord = $point ["LocationTo"] . " (" . $pointname . ")";
+							$this->lastRecord = $point . " (" . $pointname . ")";
 							
 							// : Check if offloading customer and link exist and store result in $recordExists variable
 							$myQuery = preg_replace ( "/%s/", $point . " (" . $pointname . ")", $this->_myqueries [5] );
@@ -328,12 +328,12 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 								$myQuery = preg_replace ( "/%t/", self::CUSTOMER, $myQuery );
 								$result = $this->queryDB ( $myQuery );
 								if (count ( $result ) != 0) {
-									$recordExits = FALSE;
+									$recordExists = FALSE;
 								} else {
-									$recordExits = TRUE;
+									$recordExists = TRUE;
 								}
 							} else {
-								$recordExits = TRUE;
+								$recordExists = TRUE;
 							}
 							// : End
 							
@@ -451,10 +451,10 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 						try {
 							
 							$pointname = preg_replace ( "/–/", "-", $pointname );
-							$this->lastRecord = $point ["LocationTo"] . " (" . $pointname . ")";
+							$this->lastRecord = $point . " (" . $pointname . ")";
 								
 							// : Check if offloading customer and link exist and store result in $recordExists variable
-							$recordExits = TRUE;
+							$recordExists = TRUE;
 							$myQuery = preg_replace ( "/%t/", $point . " (" . $pointname . ")", $this->_myqueries [2] );
 							$result = $this->queryDB ( $myQuery );
 							if (count ( $result ) != 0) {
@@ -462,12 +462,12 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 								$myQuery = preg_replace ( "/%o/", self::CUSTOMER, $myQuery );
 								$result = $this->queryDB ( $myQuery );
 								if (count ( $result ) != 0) {
-									$recordExits = FALSE;
+									$recordExists = FALSE;
 								} else {
-									$recordExits = TRUE;
+									$recordExists = TRUE;
 								}
 							} else {
-								$recordExits = TRUE;
+								$recordExists = TRUE;
 							}
 							// : End
 								
