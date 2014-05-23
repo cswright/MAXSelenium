@@ -153,7 +153,8 @@ class MAXLive_NCP_Rates_Update extends PHPUnit_Framework_TestCase {
 			$cities = $cPR->getCities ();
 			// Get script data settings
 			$settings = $cPR->getSettings ();
-			
+			// Get routes
+			$routes = $cPR->getRoutes ();
 			try {
 				// Initiate Session
 				$session = $this->_session;
@@ -168,7 +169,8 @@ class MAXLive_NCP_Rates_Update extends PHPUnit_Framework_TestCase {
 				
 				// : Setup local variables
 				$_bu = $settings ["BusinessUnit"];
-				$_customer = $settings ["Customer"];
+				// Correct hyphen conversion issue with spreadsheets
+				$_customer = preg_replace ( "/–/", "-", $settings ["Customer"] );
 				$_contrib = $settings ["ContribModel"];
 				$_truckType = $settings ["TruckType"];
 				$_startDate = $settings ["StartDate"];
@@ -294,7 +296,12 @@ class MAXLive_NCP_Rates_Update extends PHPUnit_Framework_TestCase {
 					$this->lastRecord = $pointname;
 					// : Get kms zone for this entry
 					$kms = preg_split ( "/kms Zone.*/", $pointname );
-					$kms = $kms [0];
+					if (count ( $kms ) != 0) {
+						$kms = $kms [0];
+					} else {
+						// Issue a user warning if $kms has no value
+						trigger_error ( "Could not get kms zone from point name.", E_USER_WARNING );
+					}
 					// : End
 					
 					// Correct hyphen conversion issue with spreadsheets
@@ -311,55 +318,55 @@ class MAXLive_NCP_Rates_Update extends PHPUnit_Framework_TestCase {
 					$result = $this->queryDB ( $myQuery );
 					if (count ( $result ) != 0) {
 						foreach ( $result as $_rateRecord ) {
-							$rate_id = $_rateRecord ["ID"];
-							$rateurl = preg_replace ( "/%s/", $rate_id, $this->_maxurl . self::RATEVAL_URL );
-							$this->_session->open ( $rateurl );
-							
-							// Wait for element = #button-create
-							$e = $w->until ( function ($session) {
-								return $session->element ( "css selector", "#button-create" );
-							} );
-							// Click element - #button-create
-							$this->_session->element ( "css selector", "#button-create" )->click ();
-							
-							// Wait for element = #button-create
-							$e = $w->until ( function ($session) {
-								return $session->element ( "xpath", "//*[contains(text(),'Create Date Range Values')]" );
-							} );
-							
-							$this->assertElementPresent ( "xpath", "//*[@id='DateRangeValue-2_0_0_beginDate-2']" );
-							$this->assertElementPresent ( "xpath", "//*[@id='DateRangeValue-4_0_0_endDate-4']" );
-							$this->assertElementPresent ( "xpath", "//*[@id='DateRangeValue-20_0_0_value-20']" );
-							$this->assertElementPresent ( "css selector", "input[type=submit][name=save]" );
-							
-							// Clear the begin date text field
-							$this->_session->element ( "xpath", "//*[@id='DateRangeValue-2_0_0_beginDate-2']" )->clear ();
-							// Paste startDate into begin date field
-							$this->_session->element ( "xpath", "//*[@id='DateRangeValue-2_0_0_beginDate-2']" )->sendKeys ( $_startDate );
-							// Clear the end date text field
-							$this->_session->element ( "xpath", "//*[@id='DateRangeValue-4_0_0_endDate-4']" )->clear ();
-							// Paste endDate into end date field
-							$this->_session->element ( "xpath", "//*[@id='DateRangeValue-4_0_0_endDate-4']" )->sendKeys ( $_endDate );
-							// Get the product name out the string
-							$productname = preg_split ( "/^" . $kms . "kms Zone /", $pointname );
-							// Format the string of the rate value xxx.xx
-							$ratevalue = strval ( (number_format ( floatval ( $routes [$kms] [$productname [1]] ), 2, ".", "" )) );
-							// Paste the formatted rate value into the value field
-							$this->_session->element ( "xpath", "//*[@id='DateRangeValue-20_0_0_value-20']" )->sendKeys ( $ratevalue );
-							// Click element - submit button
-							$this->_session->element ( "css selector", "input[type=submit][name=save]" )->click ();
+							try {
+								$rate_id = $_rateRecord ["ID"];
+								$rateurl = preg_replace ( "/%s/", $rate_id, $this->_maxurl . self::RATEVAL_URL );
+								$this->_session->open ( $rateurl );
+								
+								// Wait for element = #button-create
+								$e = $w->until ( function ($session) {
+									return $session->element ( "css selector", "#button-create" );
+								} );
+								// Click element - #button-create
+								$this->_session->element ( "css selector", "#button-create" )->click ();
+								
+								// Wait for element = #button-create
+								$e = $w->until ( function ($session) {
+									return $session->element ( "xpath", "//*[contains(text(),'Create Date Range Values')]" );
+								} );
+								
+								$this->assertElementPresent ( "xpath", "//*[@id='DateRangeValue-2_0_0_beginDate-2']" );
+								$this->assertElementPresent ( "xpath", "//*[@id='DateRangeValue-4_0_0_endDate-4']" );
+								$this->assertElementPresent ( "xpath", "//*[@id='DateRangeValue-20_0_0_value-20']" );
+								$this->assertElementPresent ( "css selector", "input[type=submit][name=save]" );
+								
+								// Clear the begin date text field
+								$this->_session->element ( "xpath", "//*[@id='DateRangeValue-2_0_0_beginDate-2']" )->clear ();
+								// Paste startDate into begin date field
+								$this->_session->element ( "xpath", "//*[@id='DateRangeValue-2_0_0_beginDate-2']" )->sendKeys ( $_startDate );
+								// Clear the end date text field
+								$this->_session->element ( "xpath", "//*[@id='DateRangeValue-4_0_0_endDate-4']" )->clear ();
+								// Paste endDate into end date field
+								$this->_session->element ( "xpath", "//*[@id='DateRangeValue-4_0_0_endDate-4']" )->sendKeys ( $_endDate );
+								// Get the product name out the string
+								$productname = preg_split ( "/^" . $kms . "kms Zone /", $pointname );
+								// Format the string of the rate value xxx.xx
+								$ratevalue = strval ( (number_format ( floatval ( $routes [$kms] [$productname [1]] ), 2, ".", "" )) );
+								// Clear value field
+								$this->_session->element ( "xpath", "//*[@id='DateRangeValue-20_0_0_value-20']" )->clear ();
+								// Paste the formatted rate value into the value field
+								$this->_session->element ( "xpath", "//*[@id='DateRangeValue-20_0_0_value-20']" )->sendKeys ( $ratevalue );
+								// Click element - submit button
+								$this->_session->element ( "css selector", "input[type=submit][name=save]" )->click ();
+							} catch ( Exception $e ) {
+								$this->storeError ( $e->getMessage () );
+							}
 						}
 					} else {
 						throw new Exception ( "Error: Rate id record not found." );
 					}
 				} catch ( Exception $e ) {
-					echo "Error: " . $e->getMessage () . PHP_EOL;
-					echo "Time of error: " . date ( "Y-m-d H:i:s" ) . PHP_EOL;
-					echo "Last record: " . $this->lastRecord;
-					$this->takeScreenshot ();
-					$_erCount = count ( $this->_error );
-					$this->_error [$_erCount + 1] ["error"] = $e->getMessage ();
-					$this->_error [$_erCount + 1] ["record"] = $this->lastRecord;
+					$this->storeError ( $e->getMessage () );
 				}
 			}
 			// : End
@@ -590,6 +597,23 @@ class MAXLive_NCP_Rates_Update extends PHPUnit_Framework_TestCase {
 		} catch ( PDOException $ex ) {
 			return FALSE;
 		}
+	}
+	
+	/**
+	 * MAXLive_NCP_Rates_Update::storeError()
+	 * Pass MySQL Query to database and return output
+	 *
+	 * @param array: $this->_error        	
+	 */
+	private function storeError($errMsg) {
+		// Print to screen
+		print ("Error: " . $errMsg . PHP_EOL) ;
+		print ("Time of error: " . date ( "Y-m-d H:i:s" ) . PHP_EOL) ;
+		print ("Last record: " . $this->lastRecord) ;
+		$this->takeScreenshot ();
+		$_erCount = count ( $this->_error );
+		$this->_error [$_erCount + 1] ["error"] = $errMsg;
+		$this->_error [$_erCount + 1] ["record"] = $this->lastRecord;
 	}
 	
 	// : End
