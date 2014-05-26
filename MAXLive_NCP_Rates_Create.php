@@ -57,6 +57,8 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 	protected $_scrDir;
 	protected $_modeRates;
 	protected $_modeLocations;
+	protected $_modeCities;
+	protected $_modeZones;
 	protected $_maxurl;
 	protected $_error = array ();
 	protected $_db;
@@ -75,7 +77,8 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 			"select ID from udo_customer where tradingName='%t';",
 			"select ID from udo_rates where route_id IN (select ID from udo_route where locationFrom_id IN (select ID from udo_location where name='%f') and locationTo_id IN (select ID from udo_location where name='%t')) and objectregistry_id=%g and objectInstanceId=%c and truckDescription_id=%d and enabled=1 and model='%m' and businessUnit_id=%b and rateType_id=%r;",
 			"select ID from objectregistry where handle = 'udo_Customer';",
-			"select ID from udo_locations where name='%s';" 
+			"select ID from udo_location where name='%s' and _type='%t';",
+			"select ID from udo_zone where name='%s';" 
 	);
 	
 	// : Public functions
@@ -95,7 +98,7 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 			return FALSE;
 		}
 		$data = parse_ini_file ( $ini );
-		if ((array_key_exists ( "rates", $data ) && $data ["rates"]) && (array_key_exists ( "locations", $data ) && $data ["locations"]) && (array_key_exists ( "xls", $data ) && $data ["xls"]) && (array_key_exists ( "errordir", $data ) && $data ["errordir"]) && (array_key_exists ( "screenshotdir", $data ) && $data ["screenshotdir"]) && (array_key_exists ( "datadir", $data ) && $data ["datadir"]) && (array_key_exists ( "ip", $data ) && $data ["ip"]) && (array_key_exists ( "username", $data ) && $data ["username"]) && (array_key_exists ( "password", $data ) && $data ["password"]) && (array_key_exists ( "welcome", $data ) && $data ["welcome"]) && (array_key_exists ( "mode", $data ) && $data ["mode"])) {
+		if ((array_key_exists ( "zones", $data ) && $data ["zones"]) && (array_key_exists ( "cities", $data ) && $data ["cities"]) && (array_key_exists ( "rates", $data ) && $data ["rates"]) && (array_key_exists ( "locations", $data ) && $data ["locations"]) && (array_key_exists ( "xls", $data ) && $data ["xls"]) && (array_key_exists ( "errordir", $data ) && $data ["errordir"]) && (array_key_exists ( "screenshotdir", $data ) && $data ["screenshotdir"]) && (array_key_exists ( "datadir", $data ) && $data ["datadir"]) && (array_key_exists ( "ip", $data ) && $data ["ip"]) && (array_key_exists ( "username", $data ) && $data ["username"]) && (array_key_exists ( "password", $data ) && $data ["password"]) && (array_key_exists ( "welcome", $data ) && $data ["welcome"]) && (array_key_exists ( "mode", $data ) && $data ["mode"])) {
 			$this->_username = $data ["username"];
 			$this->_password = $data ["password"];
 			$this->_welcome = $data ["welcome"];
@@ -105,6 +108,8 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 			$this->_modeLocations = $data ["locations"];
 			$this->_modeRates = $data ["rates"];
 			$this->_modeUpdates = $data ["updates"];
+			$this->_modeCities = $data ["cities"];
+			$this->_modeZones = $data ["zones"];
 			$this->_mode = $data ["mode"];
 			$this->_ip = $data ["ip"];
 			$this->_xls = $data ["xls"];
@@ -136,6 +141,7 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 	 * Create new class object and initialize session for webdriver
 	 */
 	public function setUp() {
+		// $wd_host = 'http://localhost:4444/wd/hub';
 		self::$driver = new PHPWebDriver_WebDriver ();
 		$this->_session = self::$driver->session ( self::TEST_SESSION );
 	}
@@ -164,7 +170,7 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 			try {
 				// Initiate Session
 				$session = $this->_session;
-				$this->_session->setPageLoadTimeout ( 60 );
+				$this->_session->setPageLoadTimeout ( 90 );
 				// Create a reference to the session object for use with waiting for elements to be present
 				$w = new PHPWebDriver_WebDriverWait ( $this->_session );
 				
@@ -291,19 +297,147 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 			
 			// : Main Loop
 			// : Create Zones
-			/*
-			 * $this->load ( $this->_maxurl . "/Country_Tab/zones?&tab_id=192" ); $this->set_implicit_wait ( 60000 ); foreach ( $routes as $key => $value ) { $this->assert_element_present ( "css=div.toolbar-cell-create" ); $this->get_element ( "css=div.toolbar-cell-create" )->click (); $this->set_implicit_wait ( 60000 ); $this->assert_element_present ( "//*[contains(text(),'Create Zones')]" ); $this->assert_element_present ( "name=udo_Zone[0][name]" ); $this->assert_element_present ( "//input[@name='udo_Zone[0][fleet]' and @value='Energy (tankers)']" ); $this->assert_element_present ( "name=udo_Zone[0][country_id]" ); $this->assert_element_present ( "name=udo_Zone[0][blackoutFactor]" ); $this->assert_element_present ( "css=input[type=submit][name=save]" ); $this->get_element ( "name=udo_Zone[0][name]" )->send_keys ( $key . "kms Zone" ); $this->get_element ( "//input[@name='udo_Zone[0][fleet]' and @value='Energy (tankers)']" )->click (); $this->get_element ( "name=udo_Zone[0][country_id]" )->select_label ( self::COUNTRY ); $this->get_element ( "name=udo_Zone[0][blackoutFactor]" )->send_keys ( self::BF ); $this->get_element ( "css=input[type=submit][name=save]" )->click (); $this->set_implicit_wait ( 60000 ); }
-			 */
+			if ($this->_modeZones == "true") {
+				foreach ( $routes as $key => $value ) {
+					
+					try {
+						
+						// Default value is record exists = false
+						$recordExists = FALSE;
+						$myQuery = preg_replace ( "/%s/", $key . "kms Zone", $this->_myqueries [6] );
+						$_result = $this->queryDB ( $myQuery );
+						
+						if (count ( $_result ) != 0) {
+							$recordExists = TRUE;
+						} else {
+							$recordExists = FALSE;
+						}
+						
+						$this->lastRecord = $key;
+						
+						if (! $recordExists) {
+							$this->_session->open ( $this->_maxurl . "/Country_Tab/zones?&tab_id=192" );
+							
+							$e = $w->until ( function ($session) {
+								return $session->element ( "css selector", "div.toolbar-cell-create" );
+							} );
+							
+							$this->_session->element ( "css selector", "div.toolbar-cell-create" )->click ();
+							
+							$e = $w->until ( function ($session) {
+								return $session->element ( "css selector", "input#udo_Zone-8_0_0_name-8" );
+							} );
+							
+							$this->assertElementPresent ( "css selector", "input#udo_Zone-8_0_0_name-8" );
+							$this->assertElementPresent ( "xpath", "//*[@id='udo_Zone-5_0_0_fleet-5[Energy (tankers)]']" );
+							$this->assertElementPresent ( "xpath", "//*[@id='udo_Zone-3__0_country_id-3']" );
+							$this->assertElementPresent ( "xpath", "//*[@id='udo_Zone-2_0_0_blackoutFactor-2']" );
+							$this->assertElementPresent ( "css selector", "input[type=submit][name=save]" );
+							
+							$this->_session->element ( "css selector", "input#udo_Zone-8_0_0_name-8" )->sendKeys ( $key . "kms Zone" );
+							$this->_session->element ( "xpath", "//*[@id='udo_Zone-5_0_0_fleet-5[Energy (tankers)]']" )->click ();
+							$this->_session->element ( "xpath", "//*[@id='udo_Zone-3__0_country_id-3']/option[text()='" . self::COUNTRY . "']" )->click ();
+							$this->_session->element ( "xpath", "//*[@id='udo_Zone-2_0_0_blackoutFactor-2']" )->sendKeys ( self::BF );
+							$this->_session->element ( "css selector", "input[type=submit][name=save]" )->click ();
+						}
+					} catch ( Exception $e ) {
+						echo "Error: " . $e->getMessage () . PHP_EOL;
+						echo "Time of error: " . date ( "Y-m-d H:i:s" ) . PHP_EOL;
+						echo "Last record: " . $this->lastRecord;
+						$this->takeScreenshot ();
+						$_erCount = count ( $this->_error );
+						$this->_error [$_erCount + 1] ["error"] = $e->getMessage ();
+						$this->_error [$_erCount + 1] ["record"] = $this->lastRecord;
+						$this->_error [$_erCount + 1] ["type"] = "Zones";
+					}
+				}
+			}
+			
 			// : End
 			
 			// : Create Cities
-			/*
-			 * $this->load ( $this->_maxurl . "/Country_Tab/cities?&tab_id=50" ); $this->set_implicit_wait ( 600000 ); foreach ( $cities as $city ) { $this->assert_element_present ( "css=div.toolbar-cell-create" ); $this->get_element ( "css=div.toolbar-cell-create" )->click (); $this->set_implicit_wait ( 60000 ); $this->assert_element_present ( "//*[contains(text(),'Capture the details of City')]" ); $this->assert_element_present ( "name=udo_City[0][name]" ); $this->assert_element_present ( "name=udo_City[0][parent_id]" ); $this->assert_element_present ( "name=checkbox_udo_City_0_active" ); $this->assert_element_present ( "css=input[type=submit][name=save]" ); $this->get_element ( "name=udo_City[0][name]" )->send_keys ( $city ); $this->get_element ( "name=udo_City[0][parent_id]" )->select_label ( self::PROVINCE ); $this->get_element ( "name=checkbox_udo_City_0_active" )->click (); $this->get_element ( "css=input[type=submit][name=save]" )->click (); $this->set_implicit_wait ( 60000 ); $this->assert_element_present ( "css=div.toolbar-cell-create" ); $this->get_element ( "css=div.toolbar-cell-create" )->click (); $this->set_implicit_wait ( 60000 ); $this->assert_element_present ( "//*[contains(text(),'Create Zones - City')]" ); $this->assert_element_present ( "name=udo_ZoneCity_link[0][zone_id]" ); $this->assert_element_present ( "css=input[type=submit][name=save]" );
-			 */
-			// $zone_id = preg_split ( "/kms.*/", $city );
-			/*
-			 * $this->get_element ( "name=udo_ZoneCity_link[0][zone_id]" )->select_label ( $zone_id [0] . "kms Zone " . self::CONTRIB ); $this->get_element ( "css=input[type=submit][name=save]" )->click (); $this->set_implicit_wait ( 60000 ); $this->assert_element_present ( "css=input[type=submit][name=save]" ); $this->get_element ( "css=input[type=submit][name=save]" )->click (); $this->set_implicit_wait ( 600000 ); }
-			 */
+			if ($this->_modeCities == "true") {
+				foreach ( $cities as $city ) {
+					try {
+						$this->lastRecord = $city;
+						// By default the record does not exist
+						$recordExists = FALSE;
+						
+						// : Build and run MySQL query to determine if city already exists
+						$myQuery = preg_replace ( "/%s/", $city, $this->_myqueries [5] );
+						$myQuery = preg_replace ( "/%t/", "udo_City", $myQuery );
+						$_result = $this->queryDB ( $myQuery );
+						if (count ( $_result ) != 0) {
+							$recordExists = TRUE;
+						} else {
+							$recordExists = FALSE;
+						}
+						// : End
+						if (! $recordExists) {
+							try {
+								$this->_session->open ( $this->_maxurl . "/Country_Tab/cities?&tab_id=50" );
+								
+								$e = $w->until ( function ($session) {
+									return $session->element ( "css selector", "div.toolbar-cell-create" );
+								} );
+								$this->_session->element ( "css selector", "div.toolbar-cell-create" )->click ();
+								
+								$e = $w->until ( function ($session) {
+									return $session->element ( "xpath", "//*[contains(text(),'Capture the details of City')]" );
+								} );
+								
+								$this->assertElementPresent ( "css selector", "#udo_City-14_0_0_name-14" );
+								$this->assertElementPresent ( "css selector", "#udo_City-15__0_parent_id-15" );
+								$this->assertElementPresent ( "css selector", "#checkbox_udo_City-2_0_0_active-2" );
+								$this->assertElementPresent ( "css selector", "input[type=submit][name=save]" );
+								
+								$this->_session->element ( "css selector", "#udo_City-14_0_0_name-14" )->sendKeys ( $city );
+								$this->_session->element ( "xpath", "//*[@id='udo_City-15__0_parent_id-15']/option[text()='" . self::PROVINCE . "']" )->click ();
+								$this->_session->element ( "css selector", "#checkbox_udo_City-2_0_0_active-2" )->click ();
+								$this->_session->element ( "css selector", "input[type=submit][name=save]" )->click ();
+								
+								$e = $w->until ( function ($session) {
+									return $session->element ( "css selector", "div.toolbar-cell-create" );
+								} );
+								
+								$this->_session->element ( "css selector", "div.toolbar-cell-create" )->click ();
+								
+								$e = $w->until ( function ($session) {
+									return $session->element ( "xpath", "//*[contains(text(),'Create Zones - City')]" );
+								} );
+								
+								$this->assertElementPresent ( "css selector", "#udo_ZoneCity_link-5__0_zone_id-5" );
+								$this->assertElementPresent ( "css selector", "input[type=submit][name=save]" );
+								
+								$zone_id = preg_split ( "/kms.*/", $city );
+								
+								$this->_session->element ( "xpath", "//*[@id='udo_ZoneCity_link-5__0_zone_id-5']/option[text()='" . $zone_id [0] . "kms Zone " . self::CONTRIB . "']" )->click ();
+								$this->_session->element ( "css selector", "input[type=submit][name=save]" )->click ();
+								
+								$e = $w->until ( function ($session) {
+									return $session->element ( "css selector", "div.toolbar-cell-create" );
+								} );
+								
+								$this->assertElementPresent ( "css selector", "input[type=submit][name=save]" );
+								$this->_session->element ( "css selector", "input[type=submit][name=save]" )->click ();
+							} catch ( Exception $e ) {
+								print ($e->getMessage ()) ;
+								exit ();
+							}
+						}
+					} catch ( Exception $e ) {
+						echo "Error: " . $e->getMessage () . PHP_EOL;
+						echo "Time of error: " . date ( "Y-m-d H:i:s" ) . PHP_EOL;
+						echo "Last record: " . $this->lastRecord;
+						$this->takeScreenshot ();
+						$_erCount = count ( $this->_error );
+						$this->_error [$_erCount + 1] ["error"] = $e->getMessage ();
+						$this->_error [$_erCount + 1] ["record"] = $this->lastRecord;
+						$this->_error [$_erCount + 1] ["type"] = "Cities";
+					}
+				}
+			}
+			
 			// Add MySQL Query to check if record exists after it has been created
 			
 			// : End
@@ -316,33 +450,39 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 						
 						try {
 							
-							$recordExists = TRUE;
+							// Get all currently open windows
+							$_winAll = $this->_session->window_handles ();
+							// Set window focus to main window
+							$this->_session->focusWindow ( $_winAll [0] );
+							// If there is more than 1 window open then close all but main window
+							if (count ( $_winAll ) > 1) {
+								$this->clearWindows ();
+							}
+							
+							$recordExists = FALSE;
 							$pointname = preg_replace ( "/–/", "-", $pointname );
 							$this->lastRecord = $point . " (" . $pointname . ")";
 							
 							// : Check if offloading customer and link exist and store result in $recordExists variable
 							$myQuery = preg_replace ( "/%s/", $point . " (" . $pointname . ")", $this->_myqueries [5] );
+							$myQuery = preg_replace ( "/%t/", "udo_Point", $myQuery );
 							$result = $this->queryDB ( $myQuery );
 							if (count ( $result ) != 0) {
 								$myQuery = preg_replace ( "/%n/", $point . " (" . $pointname . ")", $this->_myqueries [0] );
 								$myQuery = preg_replace ( "/%t/", self::CUSTOMER, $myQuery );
 								$result = $this->queryDB ( $myQuery );
 								if (count ( $result ) != 0) {
-									$recordExists = FALSE;
-								} else {
 									$recordExists = TRUE;
+								} else {
+									$recordExists = FALSE;
 								}
 							} else {
-								$recordExists = TRUE;
+								$recordExists = FALSE;
 							}
 							// : End
 							
 							// Load MAX customer page
 							if (! $recordExists) {
-								$_winAll = $this->_session->window_handles ();
-								if (count ( $_winAll ) > 1) {
-									$this->clearWindows ();
-								}
 								
 								$this->_session->open ( $this->_maxurl . self::CUSTOMER_URL . $customer_id );
 								// Wait for element = #subtabselector
@@ -366,9 +506,11 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 								$this->_session->element ( "link text", "Create Location" )->click ();
 								
 								// Select New Window
-								$_allWin = $this->_session->window_handles ();
-								if (count ( $_allWin > 1 )) {
-									$this->_session->focusWindow ( $_allWin [1] );
+								$_winAll = $this->_session->window_handles ();
+								if (count ( $_winAll > 1 )) {
+									$this->_session->focusWindow ( $_winAll [1] );
+								} else {
+									throw new Exception ( "ERROR: Window not present" );
 								}
 								
 								$e = $w->until ( function ($session) {
@@ -383,25 +525,30 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 									return $session->element ( "xpath", "//*[contains(text(),'Capture the details of Point')]" );
 								} );
 								// Assert all elements on current page are present
-								$this->assertElementPresent ( "xpath", "//*[@id='udo_Point-14_0_0_name-14']" );
-								$this->assertElementPresent ( "xpath", "//*[@id='udo_Point-15__0_parent_id-15']" );
-								$this->assertElementPresent ( "xpath", "//*[@id='udo_Point-32_0_0_pointType_id-32[2]']" );
-								$this->assertElementPresent ( "xpath", "//*[@id='checkbox_udo_Point-2_0_0_active-2']" );
-								$this->assertElementPresent ( "css selector", "input[type=submit][name=save]" );
-								// Enter name of new location in text field
-								$this->_session->element ( "xpath", "//*[@id='udo_Point-14_0_0_name-14']" )->sendKeys ( $point . " (" . $pointname . ")" );
-								// Select parent location from select box
-								$this->_session->element ( "xpath", "//*[@id='udo_Point-15__0_parent_id-15']/option[text()='" . self::PROVINCE . " -- " . $pointname . "']" )->click ();
-								// Check the offloading point checkbox
-								$this->_session->element ( "xpath", "//*[@id='udo_Point-32_0_0_pointType_id-32[2]']" )->click ();
-								// Check the active checkbox
-								$this->_session->element ( "xpath", "//*[@id='checkbox_udo_Point-2_0_0_active-2']" )->click ();
-								// Click the submit button
-								$this->_session->element ( "css selector", "input[type=submit][name=save]" )->click ();
+								try {
+									$this->assertElementPresent ( "xpath", "//*[@id='udo_Point-14_0_0_name-14']" );
+									$this->assertElementPresent ( "xpath", "//*[@id='udo_Point-15__0_parent_id-15']" );
+									$this->assertElementPresent ( "xpath", "//*[@id='udo_Point-32_0_0_pointType_id-32[2]']" );
+									$this->assertElementPresent ( "xpath", "//*[@id='checkbox_udo_Point-2_0_0_active-2']" );
+									$this->assertElementPresent ( "css selector", "input[type=submit][name=save]" );
+									// Enter name of new location in text field
+									$this->_session->element ( "xpath", "//*[@id='udo_Point-14_0_0_name-14']" )->sendKeys ( $point . " (" . $pointname . ")" );
+									// Select parent location from select box
+									$this->_session->element ( "xpath", "//*[@id='udo_Point-15__0_parent_id-15']/option[text()='" . self::PROVINCE . " -- " . $pointname . "']" )->click ();
+									// Check the offloading point checkbox
+									$this->_session->element ( "xpath", "//*[@id='udo_Point-32_0_0_pointType_id-32[2]']" )->click ();
+									// Check the active checkbox
+									$this->_session->element ( "xpath", "//*[@id='checkbox_udo_Point-2_0_0_active-2']" )->click ();
+									// Click the submit button
+									$this->_session->element ( "css selector", "input[type=submit][name=save]" )->click ();
+								} catch ( Exception $e ) {
+									print ($e->getMessage ()) ;
+									exit ();
+								}
 								
 								// Select Parent Window
-								if (count ( $_allWin > 1 )) {
-									$this->_session->focusWindow ( $_allWin [0] );
+								if (count ( $_winAll > 1 )) {
+									$this->_session->focusWindow ( $_winAll [0] );
 								}
 								// Wait for element
 								$e = $w->until ( function ($session) {
@@ -463,15 +610,20 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 						
 						try {
 							
+							// Get all currently open windows
+							$_winAll = $this->_session->window_handles ();
+							// Set window focus to main window
+							$this->_session->focusWindow ( $_winAll [0] );
+							// If there is more than 1 window open then close all but main window
+							if (count ( $_winAll ) > 1) {
+								$this->clearWindows ();
+							}
+							
 							$pointname = preg_replace ( "/–/", "-", $pointname );
 							$this->lastRecord = $point . " (" . $pointname . ")";
 							
 							// : Check if offloading customer and link exist and store result in $recordExists variable
-							$_winAll = $this->_session->window_handles ();
-							if (count ( $_winAll ) > 1) {
-								$this->clearWindows ();
-							}
-							$recordExists = TRUE;
+							$recordExists = FALSE;
 							$myQuery = preg_replace ( "/%t/", $point . " (" . $pointname . ")", $this->_myqueries [2] );
 							$result = $this->queryDB ( $myQuery );
 							if (count ( $result ) != 0) {
@@ -479,12 +631,12 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 								$myQuery = preg_replace ( "/%o/", self::CUSTOMER, $myQuery );
 								$result = $this->queryDB ( $myQuery );
 								if (count ( $result ) != 0) {
-									$recordExists = FALSE;
-								} else {
 									$recordExists = TRUE;
+								} else {
+									$recordExists = FALSE;
 								}
 							} else {
-								$recordExists = TRUE;
+								$recordExists = FALSE;
 							}
 							// : End
 							
@@ -515,9 +667,9 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 								$this->_session->element ( "link text", "Create Customer" )->click ();
 								
 								// Select New Window
-								$_allWin = $this->_session->window_handles ();
-								if (count ( $_allWin > 1 )) {
-									$this->_session->focusWindow ( $_allWin [1] );
+								$_winAll = $this->_session->window_handles ();
+								if (count ( $_winAll > 1 )) {
+									$this->_session->focusWindow ( $_winAll [1] );
 								}
 								
 								// Wait for element = Page heading
@@ -537,8 +689,10 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 								$this->_session->element ( "xpath", "//*[@id='checkbox_udo_Customer-2_0_0_active-2']" )->click ();
 								$this->_session->element ( "css selector", "input[type=submit][name=save]" )->click ();
 								
-								if (count ( $_allWin > 1 )) {
-									$this->_session->focusWindow ( $_allWin [0] );
+								if (count ( $_winAll > 1 )) {
+									$this->_session->focusWindow ( $_winAll [0] );
+								} else {
+									throw new Exception ( "ERROR: Window not present" );
 								}
 								
 								// Wait for element = Page heading
@@ -607,8 +761,11 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 				foreach ( $cities as $pointname ) {
 					
 					try {
-						
+						// Get all currently open windows
 						$_winAll = $this->_session->window_handles ();
+						// Set window focus to main window
+						$this->_session->focusWindow ( $_winAll [0] );
+						// If there is more than 1 window open then close all but main window
 						if (count ( $_winAll ) > 1) {
 							$this->clearWindows ();
 						}
@@ -673,6 +830,8 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 							$_allWin = $this->_session->window_handles ();
 							if (count ( $_allWin > 1 )) {
 								$this->_session->focusWindow ( $_allWin [1] );
+							} else {
+								throw new Exception ( "ERROR: Window not present." );
 							}
 							
 							// Wait for element Page Heading
