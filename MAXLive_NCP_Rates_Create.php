@@ -35,7 +35,6 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 	const TEST_URL = "http://max.mobilize.biz";
 	const INI_FILE = "rates_data.ini";
 	const INI_DIR = "ini";
-	const TEST_SESSION = "firefox";
 	const XLS_CREATOR = "MAXLive_NCP_Rates_Create.php";
 	const XLS_TITLE = "Error Report";
 	const XLS_SUBJECT = "Errors caught while creating rates for subcontracts";
@@ -55,8 +54,11 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 	protected $_dataDir;
 	protected $_errDir;
 	protected $_scrDir;
+	protected $_wdport;
+	protected $_browser;
 	protected $_modeRates;
 	protected $_modeLocations;
+	protected $_modeOffloadCustomer;
 	protected $_modeCities;
 	protected $_modeZones;
 	protected $_maxurl;
@@ -98,7 +100,7 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 			return FALSE;
 		}
 		$data = parse_ini_file ( $ini );
-		if ((array_key_exists ( "zones", $data ) && $data ["zones"]) && (array_key_exists ( "cities", $data ) && $data ["cities"]) && (array_key_exists ( "rates", $data ) && $data ["rates"]) && (array_key_exists ( "locations", $data ) && $data ["locations"]) && (array_key_exists ( "xls", $data ) && $data ["xls"]) && (array_key_exists ( "errordir", $data ) && $data ["errordir"]) && (array_key_exists ( "screenshotdir", $data ) && $data ["screenshotdir"]) && (array_key_exists ( "datadir", $data ) && $data ["datadir"]) && (array_key_exists ( "ip", $data ) && $data ["ip"]) && (array_key_exists ( "username", $data ) && $data ["username"]) && (array_key_exists ( "password", $data ) && $data ["password"]) && (array_key_exists ( "welcome", $data ) && $data ["welcome"]) && (array_key_exists ( "mode", $data ) && $data ["mode"])) {
+		if ((array_key_exists ( "browser", $data ) && $data ["browser"]) && (array_key_exists ( "offloadcustomer", $data ) && $data ["offloadcustomer"]) && (array_key_exists ( "wdport", $data ) && $data ["wdport"]) && (array_key_exists ( "zones", $data ) && $data ["zones"]) && (array_key_exists ( "cities", $data ) && $data ["cities"]) && (array_key_exists ( "rates", $data ) && $data ["rates"]) && (array_key_exists ( "locations", $data ) && $data ["locations"]) && (array_key_exists ( "xls", $data ) && $data ["xls"]) && (array_key_exists ( "errordir", $data ) && $data ["errordir"]) && (array_key_exists ( "screenshotdir", $data ) && $data ["screenshotdir"]) && (array_key_exists ( "datadir", $data ) && $data ["datadir"]) && (array_key_exists ( "ip", $data ) && $data ["ip"]) && (array_key_exists ( "username", $data ) && $data ["username"]) && (array_key_exists ( "password", $data ) && $data ["password"]) && (array_key_exists ( "welcome", $data ) && $data ["welcome"]) && (array_key_exists ( "mode", $data ) && $data ["mode"])) {
 			$this->_username = $data ["username"];
 			$this->_password = $data ["password"];
 			$this->_welcome = $data ["welcome"];
@@ -106,12 +108,15 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 			$this->_errDir = $data ["errordir"];
 			$this->_scrDir = $data ["screenshotdir"];
 			$this->_modeLocations = $data ["locations"];
+			$this->_modeOffloadCustomer = $data ["offloadcustomer"];
 			$this->_modeRates = $data ["rates"];
 			$this->_modeUpdates = $data ["updates"];
 			$this->_modeCities = $data ["cities"];
 			$this->_modeZones = $data ["zones"];
 			$this->_mode = $data ["mode"];
 			$this->_ip = $data ["ip"];
+			$this->_wdport = $data ["wdport"];
+			$this->_browser = $data ["browser"];
 			$this->_xls = $data ["xls"];
 			switch ($this->_mode) {
 				case "live" :
@@ -141,9 +146,9 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 	 * Create new class object and initialize session for webdriver
 	 */
 	public function setUp() {
-		// $wd_host = 'http://localhost:4444/wd/hub';
-		self::$driver = new PHPWebDriver_WebDriver ();
-		$this->_session = self::$driver->session ( self::TEST_SESSION );
+		$wd_host = "http://localhost:$this->_wdport/wd/hub";
+		self::$driver = new PHPWebDriver_WebDriver ( $wd_host );
+		$this->_session = self::$driver->session ( $this->_browser );
 	}
 	
 	/**
@@ -444,7 +449,7 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 			
 			// : Create and link points to the Customer
 			if ($this->_modeLocations == "true") {
-				foreach ( $points ["LocationFrom"] as $point ) {
+				foreach ( $points ["LocationTo"] as $point ) {
 					
 					foreach ( $cities as $pointname ) {
 						
@@ -602,13 +607,18 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 						}
 					}
 				}
-				
-				// : Create and link offloading customers to the Customer
+			}
+			
+			// : Create and link offloading customers to the Customer
+			if ($this->_modeOffloadCustomer == "true") {
 				foreach ( $points ["LocationTo"] as $point ) {
 					
 					foreach ( $cities as $pointname ) {
 						
 						try {
+							print ($point . PHP_EOL) ;
+							print ($pointname . PHP_EOL) ;
+							exit ();
 							
 							// Get all currently open windows
 							$_winAll = $this->_session->window_handles ();
