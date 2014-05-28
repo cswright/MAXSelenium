@@ -616,9 +616,6 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 					foreach ( $cities as $pointname ) {
 						
 						try {
-							print ($point . PHP_EOL) ;
-							print ($pointname . PHP_EOL) ;
-							exit ();
 							
 							// Get all currently open windows
 							$_winAll = $this->_session->window_handles ();
@@ -637,8 +634,8 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 							$myQuery = preg_replace ( "/%t/", $point . " (" . $pointname . ")", $this->_myqueries [2] );
 							$result = $this->queryDB ( $myQuery );
 							if (count ( $result ) != 0) {
-								$myQuery = preg_replace ( "/%n/", $point . " (" . $pointname . ")", $this->_myqueries [1] );
-								$myQuery = preg_replace ( "/%o/", self::CUSTOMER, $myQuery );
+								$myQuery = preg_replace ( "/%t/", self::CUSTOMER, $this->_myqueries [1] );
+								$myQuery = preg_replace ( "/%o/", $point . " (" . $pointname . ")", $myQuery );
 								$result = $this->queryDB ( $myQuery );
 								if (count ( $result ) != 0) {
 									$recordExists = TRUE;
@@ -651,6 +648,7 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 							// : End
 							
 							if (! $recordExists) {
+								try {
 								// : Load customer data browser page for Customer
 								$this->_session->open ( $this->_maxurl . self::CUSTOMER_URL . $customer_id );
 								
@@ -681,10 +679,13 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 								if (count ( $_winAll > 1 )) {
 									$this->_session->focusWindow ( $_winAll [1] );
 								}
+								else {
+									throw new Exception ( "ERROR: Window not present" );
+								}
 								
 								// Wait for element = Page heading
 								$e = $w->until ( function ($session) {
-									return $session->element ( "xpath", "//*[contains(text(),'Create Customer')]" );
+									return $session->element ( "xpath", "//*[@id='udo_Customer-22_0_0_tradingName-22']" );
 								} );
 								
 								$this->assertElementPresent ( "xpath", "//*[@id='udo_Customer-22_0_0_tradingName-22']" );
@@ -701,8 +702,6 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 								
 								if (count ( $_winAll > 1 )) {
 									$this->_session->focusWindow ( $_winAll [0] );
-								} else {
-									throw new Exception ( "ERROR: Window not present" );
 								}
 								
 								// Wait for element = Page heading
@@ -728,7 +727,7 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 								$e = $w->until ( function ($session) {
 									return $session->element ( "css selector", "#subtabselector" );
 								} );
-								$this->_session->element ( "xpath", "//*[@id='subtabselector']/select/option[text()='Offloading Customers - Business Unit']" );
+								$this->_session->element ( "xpath", "//*[@id='subtabselector']/select/option[text()='Offloading Customers - Business Unit']" )->click();
 								
 								// Wait for element = #button-create
 								$e = $w->until ( function ($session) {
@@ -752,6 +751,11 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 									return $session->element ( "xpath", "//div[@id='button-create']" );
 								} );
 							}
+							catch (Exception $e) {
+								print($e->getMessage());
+								exit;
+							}
+							}
 						} catch ( Exception $e ) {
 							echo "Error: " . $e->getMessage () . PHP_EOL;
 							echo "Time of error: " . date ( "Y-m-d H:i:s" ) . PHP_EOL;
@@ -760,7 +764,7 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 							$_erCount = count ( $this->_error );
 							$this->_error [$_erCount + 1] ["error"] = $e->getMessage ();
 							$this->_error [$_erCount + 1] ["record"] = $this->lastRecord;
-							$this->_error [$_erCount + 1] ["type"] = "Locations";
+							$this->_error [$_erCount + 1] ["type"] = "Offloading Customer";
 						}
 					}
 				}
