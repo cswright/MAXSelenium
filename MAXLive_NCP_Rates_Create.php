@@ -824,22 +824,8 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 							// Select Rates from the select box
 							$this->_session->element ( "xpath", "//*[@id='subtabselector']/select/option[text()='Rates']" )->click ();
 							
-							// : Run SQL Query to determine which location from to use - point/city
-							$myQuery = "select name from udo_location where ID IN (select parent_id from udo_location where name='" . $point . "');";
-							$result = $this->queryDB ( $myQuery );
-							if (count ( $result ) != 0) {
-								$locationFrom_id = $result [0] ["name"];
-							}
-							else {
-								throw new Exception("Could not find location from udo_location: " . $point);
-							}
-							// : End
-							
-							// Correct hyphen conversion issue with spreadsheets
-							$pointname = preg_replace ( "/–/", "-", $pointname );
-							
 							// : Run SQL Query to check if route and rate already has been created
-							$myQuery = preg_replace ( "/%f/", $locationFrom_id, $this->_myqueries [3] );
+							$myQuery = preg_replace ( "/%f/", $point, $this->_myqueries [3] );
 							$myQuery = preg_replace ( "/%t/", $pointname, $myQuery );
 							$myQuery = preg_replace ( "/%g/", $objectregistry_id, $myQuery );
 							$myQuery = preg_replace ( "/%c/", $customer_id, $myQuery );
@@ -848,6 +834,7 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 							$myQuery = preg_replace ( "/%b/", $bunit_id, $myQuery );
 							$myQuery = preg_replace ( "/%r/", $rateType_id, $myQuery );
 							$result = $this->queryDB ( $myQuery );
+							
 							// : End
 							
 							if (count ( $result ) == 0) {
@@ -874,7 +861,7 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 								} else {
 									throw new Exception ( "ERROR: Window not present." );
 								}
-								
+								try {
 								// Wait for element Page Heading
 								$e = $w->until ( function ($session) {
 									return $session->element ( "xpath", "//*[@id='udo_Route-6__0_locationFrom_id-6']" );
@@ -888,7 +875,7 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 								// : End
 								
 								try {
-									$this->_session->element ( "xpath", "//*[@id='udo_Route-6__0_locationFrom_id-6']/option[text()=' . $locationFrom_id . ']" )->click ();
+									$this->_session->element ( "xpath", "//*[@id='udo_Route-6__0_locationFrom_id-6']/option[text()='$point']" )->click ();
 								} catch ( PHPWebDriver_NoSuchElementWebDriverError $e ) {
 									throw new Exception ("ERROR: Could not find the location from on the create route page" . PHP_EOL . $e->getMessage());
 								}
@@ -916,14 +903,18 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 								$this->assertElementPresent ( "xpath", "//*[@id='checkbox_udo_Rates-15_0_0_enabled-15']" );
 								$this->assertElementPresent ( "css selector", "input[type=submit][name=save]" );
 								
-								$this->_session->element ( "xpath", "//*[@id='udo_Rates-31__0_route_id-31']/option[text()='" . $locationFrom_id . " TO " . $pointname . "']" )->click ();
+								$this->_session->element ( "xpath", "//*[@id='udo_Rates-31__0_route_id-31']/option[text()='" . $point . " TO " . $pointname . "']" )->click ();
 								$this->_session->element ( "xpath", "//*[@id='udo_Rates-30__0_rateType_id-30']/option[text()='$_rateType']" )->click ();
 								$this->_session->element ( "xpath", "//*[@id='udo_Rates-4__0_businessUnit_id-4']/option[text()='" . $_bu . "']" )->click ();
 								$this->_session->element ( "xpath", "//*[@id='udo_Rates-36__0_truckDescription_id-36']/option[text()='$_truckType']" )->click ();
 								$this->_session->element ( "xpath", "//*[@id='udo_Rates-20__0_model-20']/option[text()='" . $_contrib . "']" )->click ();
 								$this->_session->element ( "xpath", "//*[@id='checkbox_udo_Rates-15_0_0_enabled-15']" )->click ();
 								$this->_session->element ( "css selector", "input[type=submit][name=save]" )->click ();
-								
+								}
+								catch (Exception $e) {
+									print($e->getMessage() . PHP_EOL);
+									exit;
+								}
 								// Wait for element = #button-create
 								try {
 								$e = $w->until ( function ($session) {
@@ -934,7 +925,7 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 								}
 								
 								// : Create Rate Value for Route
-								$myQuery = preg_replace ( "/%f/", $locationFrom_id, $this->_myqueries [3] );
+								$myQuery = preg_replace ( "/%f/", $point, $this->_myqueries [3] );
 								$myQuery = preg_replace ( "/%t/", $pointname, $myQuery );
 								$myQuery = preg_replace ( "/%g/", $objectregistry_id, $myQuery );
 								$myQuery = preg_replace ( "/%c/", $customer_id, $myQuery );
