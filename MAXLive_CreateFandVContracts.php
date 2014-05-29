@@ -39,7 +39,7 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 	const FANDVURL = "/DataBrowser?browsePrimaryObject=910&browsePrimaryInstance=";
 	const RATEDATAURL = "/DataBrowser?browsePrimaryObject=udo_Rates&browsePrimaryInstance=";
 	const DS = DIRECTORY_SEPARATOR;
-	const XLS_CREATOR = "MAXLive_Subcontractors.php";
+	const XLS_CREATOR = "MAXLive_CreateFandVContracts.php";
 	const XLS_TITLE = "Error Report";
 	const XLS_SUBJECT = "Errors caught while creating rates for subcontracts";
 	
@@ -53,15 +53,20 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 	protected $message;
 	protected $_maxurl;
 	protected $_mode;
+	protected $_error = array ();
+	protected $_wdport;
 	protected $var_rate_id;
 	protected $_username;
 	protected $_password;
 	protected $_welcome;
 	protected $_xls;
+	protected $_ip;
 	protected $_dataDir;
+	protected $_errDir;
+	protected $_scrDir;
 	protected $_db;
 	protected $_error = array ();
-	protected $_dbdsn = "mysql:host=192.168.1.43;dbname=max2;charset=utf8;";
+	protected $_dbdsn = "mysql:host=%s;dbname=max2;charset=utf8;";
 	protected $_dbuser = "root";
 	protected $_dbpwd = "kaluma";
 	protected $_dboptions = array (
@@ -103,12 +108,16 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 			return FALSE;
 		}
 		$data = parse_ini_file ( $ini );
-		if ((array_key_exists ( "dataDir", $data ) && $data ["dataDir"]) && (array_key_exists ( "username", $data ) && $data ["username"]) && (array_key_exists ( "xls", $data ) && $data ["xls"]) && (array_key_exists ( "password", $data ) && $data ["password"]) && (array_key_exists ( "welcome", $data ) && $data ["welcome"]) && (array_key_exists ( "mode", $data ) && $data ["mode"])) {
+		if ((array_key_exists ( "ip", $data ) && $data ["ip"]) && (array_key_exists ( "datadir", $data ) && $data ["datadir"]) && (array_key_exists ( "username", $data ) && $data ["username"]) && (array_key_exists ( "xls", $data ) && $data ["xls"]) && (array_key_exists ( "password", $data ) && $data ["password"]) && (array_key_exists ( "welcome", $data ) && $data ["welcome"]) && (array_key_exists ( "mode", $data ) && $data ["mode"])) {
 			$this->_username = $data ["username"];
 			$this->_password = $data ["password"];
 			$this->_welcome = $data ["welcome"];
+			$this->_dataDir = $data ["datadir"];
+			$this->_errDir = $data ["errordir"];
+			$this->_scrDir = $data ["screenshotdir"];
 			$this->_xls = $data ["xls"];
-			$this->_dataDir = $data ["dataDir"];
+			$this->_ip = $data ["ip"];
+			$this->_wdport = $data ["wdport"];
 			$this->_mode = $data ["mode"];
 			switch ($this->_mode) {
 				case "live" :
@@ -138,7 +147,8 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 	 * Setup instance
 	 */
 	public function setUp() {
-		self::$driver = new PHPWebDriver_WebDriver ();
+		$wd_host = "http://localhost:$this->_wdport/wd/hub";
+		self::$driver = new PHPWebDriver_WebDriver ($wd_host);
 		$this->_session = self::$driver->session ( self::TEST_SESSION );
 	}
 	
@@ -155,11 +165,15 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 			
 			// Initiate Session
 			$session = $this->_session;
-			$this->_session->setPageLoadTimeout ( 180 );
+			$this->_session->setPageLoadTimeout ( 90 );
 			$w = new PHPWebDriver_WebDriverWait ( $this->_session );
 			$FandVContract = new FandVReadXLSData ( $file );
 			$FandVData = $FandVContract->getData ();
-			$this->openDB ( $this->_dbdsn, $this->_dbuser, $this->_dbpwd, $this->_dboptions );
+			
+			// : Connect to database
+			$_mysqlDsn = preg_replace ( "/%s/", $this->_ip, $this->_dbdsn );
+			$this->openDB ( $_mysqlDsn, $this->_dbuser, $this->_dbpwd, $this->_dboptions );
+			// : End
 			
 			// : Login
 			$this->_session->open ( $this->_maxurl );
