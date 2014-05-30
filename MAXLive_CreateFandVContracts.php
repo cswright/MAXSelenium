@@ -1,14 +1,22 @@
 <?php
+
+// : Error reporting settings
+error_reporting(E_ALL);
+ini_set('log_errors','1');
+ini_set('error_log', dirname(__FILE__) . '/my-errors.log');
+ini_set('display_errors','0');
+// : End
+
 // : Includes
-require_once ('PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriver.php');
-require_once ('PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriverWait.php');
-require_once ('PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriverBy.php');
-require_once dirname ( __FILE__ ) . '/FandVReadXLSData.php';
-require_once dirname ( __FILE__ ) . '/Classes/PHPExcel.php';
+include_once ('PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriver.php');
+include_once ('PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriverWait.php');
+include_once ('PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriverBy.php');
+include_once dirname ( __FILE__ ) . '/FandVReadXLSData.php';
+include_once 'PHPUnit/Extensions/PHPExcel/Classes/PHPExcel.php';
 /**
  * PHPExcel_Writer_Excel2007
  */
-include dirname ( __FILE__ ) . '/Classes/PHPExcel/Writer/Excel2007.php';
+include 'PHPUnit/Extensions/PHPExcel/Classes/PHPExcel/Writer/Excel2007.php';
 // : End
 
 /**
@@ -32,7 +40,7 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 	const CONTRIB = "Freight (Long Distance)";
 	const LIVE_URL = "https://login.max.bwtsgroup.com";
 	const TEST_URL = "http://max.mobilize.biz";
-	const INI_FILE = "fandvcontracts.ini";
+	const INI_FILE = "fandv_data.ini";
 	const INI_DIR = "ini";
 	const TEST_SESSION = "firefox";
 	const CUSTOMERURL = "/DataBrowser?browsePrimaryObject=461&browsePrimaryInstance=%s&browseSecondaryObject=910&useDataViewForSecondary=758&tab_id=61";
@@ -41,7 +49,7 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 	const DS = DIRECTORY_SEPARATOR;
 	const XLS_CREATOR = "MAXLive_CreateFandVContracts.php";
 	const XLS_TITLE = "Error Report";
-	const XLS_SUBJECT = "Errors caught while creating rates for subcontracts";
+	const XLS_SUBJECT = "Errors caught while creating F & V contracts";
 	
 	// : Variables
 	protected static $driver;
@@ -61,11 +69,12 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 	protected $_welcome;
 	protected $_xls;
 	protected $_ip;
+	protected $_data;
 	protected $_dataDir;
 	protected $_errDir;
 	protected $_scrDir;
 	protected $_db;
-	protected $_error = array ();
+	protected $_browser;
 	protected $_dbdsn = "mysql:host=%s;dbname=max2;charset=utf8;";
 	protected $_dbuser = "root";
 	protected $_dbpwd = "kaluma";
@@ -83,21 +92,6 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 	
 	// : Magic
 	/**
-	 * MAXLive_CreateFandVContracts::__call($name, $arguments)
-	 * Forward calls to main driver
-	 */
-	public function __call($name, $arguments) {
-		if (method_exists ( $this->driver, $name )) {
-			return call_user_func_array ( array (
-					$this->driver,
-					$name 
-			), $arguments );
-		} else {
-			throw new Exception ( "Tried to call nonexistent method $name with arguments:\n" . print_r ( $arguments, true ) );
-		}
-	}
-	
-	/**
 	 * MAXLive_CreateFandVContracts::__construct()
 	 * Class constructor
 	 */
@@ -108,7 +102,7 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 			return FALSE;
 		}
 		$data = parse_ini_file ( $ini );
-		if ((array_key_exists ( "ip", $data ) && $data ["ip"]) && (array_key_exists ( "datadir", $data ) && $data ["datadir"]) && (array_key_exists ( "username", $data ) && $data ["username"]) && (array_key_exists ( "xls", $data ) && $data ["xls"]) && (array_key_exists ( "password", $data ) && $data ["password"]) && (array_key_exists ( "welcome", $data ) && $data ["welcome"]) && (array_key_exists ( "mode", $data ) && $data ["mode"])) {
+		if ((array_key_exists ( "browser", $data ) && $data ["browser"]) && (array_key_exists ( "ip", $data ) && $data ["ip"]) && (array_key_exists ( "datadir", $data ) && $data ["datadir"]) && (array_key_exists ( "username", $data ) && $data ["username"]) && (array_key_exists ( "xls", $data ) && $data ["xls"]) && (array_key_exists ( "password", $data ) && $data ["password"]) && (array_key_exists ( "welcome", $data ) && $data ["welcome"]) && (array_key_exists ( "mode", $data ) && $data ["mode"])) {
 			$this->_username = $data ["username"];
 			$this->_password = $data ["password"];
 			$this->_welcome = $data ["welcome"];
@@ -118,6 +112,7 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 			$this->_xls = $data ["xls"];
 			$this->_ip = $data ["ip"];
 			$this->_wdport = $data ["wdport"];
+			$this->_browser = $data ["browser"];
 			$this->_mode = $data ["mode"];
 			switch ($this->_mode) {
 				case "live" :
@@ -148,7 +143,7 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 	 */
 	public function setUp() {
 		$wd_host = "http://localhost:$this->_wdport/wd/hub";
-		self::$driver = new PHPWebDriver_WebDriver ($wd_host);
+		self::$driver = new PHPWebDriver_WebDriver ( $wd_host );
 		$this->_session = self::$driver->session ( self::TEST_SESSION );
 	}
 	
@@ -160,15 +155,28 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 		
 		// : Pull F and V Contract data from correctly formatted xls spreadsheet
 		$_datadir = preg_replace ( '/\//', self::DS, $this->_dataDir );
-		$file = dirname ( __FILE__ ) . self::DS . $_datadir . self::DS . $this->_xls;
+		$file = dirname ( __FILE__ ) . $_datadir . $this->_xls;
 		if (file_exists ( $file )) {
 			
 			// Initiate Session
 			$session = $this->_session;
 			$this->_session->setPageLoadTimeout ( 90 );
 			$w = new PHPWebDriver_WebDriverWait ( $this->_session );
+			
+			// : Get xls data
 			$FandVContract = new FandVReadXLSData ( $file );
-			$FandVData = $FandVContract->getData ();
+			$this->_data = $FandVContract->getData ();
+			// : End
+			
+			// : Build columns to be used when creating the error report spreadsheet
+			$_xlsColumns = array (
+					"Error_Msg"
+			);
+			
+			foreach ( $this->_data[0] as $key => $value ) {
+				$_xlsColumns[] = $key; 
+			}
+			// : End
 			
 			// : Connect to database
 			$_mysqlDsn = preg_replace ( "/%s/", $this->_ip, $this->_dbdsn );
@@ -228,15 +236,18 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 			// : End
 			
 			// : Main Loop
-			foreach ( $FandVData as $key => $value ) {
+			foreach ( $this->_data as $key => $value ) {
 				try {
 					// : Check customer and truck type exist in database
 					$customer_id = NULL;
 					$trucktype_id = NULL;
+					// Store each record currently been processed for error reporting purposes
 					$this->lastRecord = 'Contract: ' . $value ['Contract'] . ', Customer: ' . $value ['Customer'] . ', VRate: ' . strval ( $value ['Rate'] ) . ', TruckType: ' . $value ['Truck Type'] . ', Fixed Cost: ' . $value ['Cost'];
+					// Get customer ID from database
 					$customer_id = $this->queryDB ( "select ID from udo_customer where tradingName = '" . $value ["Customer"] . "';" );
-					$trucktype_id = $this->queryDB("select ID from udo_truckdescription where description='" . $value["Truck Type"] . "';");
-					if ((($customer_id != NULL) && (count($customer_id) != 0)) && (($trucktype_id != NULL) && (count($trucktype_id) != 0))) {
+					// Get truckdescription ID from database
+					$trucktype_id = $this->queryDB ( "select ID from udo_truckdescription where description='" . $value ["Truck Type"] . "';" );
+					if ((($customer_id != NULL) && (count ( $customer_id ) != 0)) && (($trucktype_id != NULL) && (count ( $trucktype_id ) != 0))) {
 						$customer_id = $customer_id [0] ["ID"];
 						$trucktype_id = $trucktype_id [0] ["ID"];
 						$url = preg_replace ( '/%s/', $customer_id, self::CUSTOMERURL );
@@ -245,6 +256,7 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 						throw new Exception ( "Customer not found: " . $value ["Customer"] );
 					}
 					// : End
+					// Wait for element = #subtabselector
 					$e = $w->until ( function ($session) {
 						return $session->element ( 'css selector', '#subtabselector' );
 					} );
@@ -299,7 +311,7 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 							"SELECT ID, variableCostRate_id FROM udo_fandvcontract WHERE fixedCost='" . strval ( number_format ( floatval ( $value ["Cost"] ), 2, "", "" ) ) . "' AND fixedContribution='" . strval ( number_format ( floatval ( $value ["Contrib"] ), 2, "", "" ) ) . "' AND startDate='" . $startDate . "' AND endDate='" . $endDate . "' AND businessUnit_id IN (SELECT ID FROM udo_businessunit WHERE name='" . $value ["Business Unit"] . "') AND customer_id IN (SELECT ID FROM udo_customer WHERE tradingName='" . $value ["Customer"] . "');",
 							"SELECT description FROM udo_truckdescription WHERE ID IN (SELECT truckDescription_id FROM udo_rates WHERE ID=%s);",
 							"SELECT value FROM daterangevalue WHERE objectInstanceid=%s and type='Rate';",
-							"SELECT ID FROM udo_truck WHERE fleetnum='%t';"
+							"SELECT ID FROM udo_truck WHERE fleetnum='%t';" 
 					);
 					$myresult = $this->queryDB ( $myquery [0] );
 					$fandvid = 0;
@@ -310,8 +322,8 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 							$truckDesc = $this->queryDB ( $aQuery );
 							$aQuery = preg_replace ( '/%s/', $rows ["variableCostRate_id"], $myquery [2] );
 							$varRate = $this->queryDB ( $aQuery );
-							if (($value["Rate"] != "0") && ($value["Rate"] != "0.00")) {
-							$_vrate = strval ( number_format ( floatval ( $value ["Rate"] ), 2, "", "" ) ) . ".0000";
+							if (($value ["Rate"] != "0") && ($value ["Rate"] != "0.00")) {
+								$_vrate = strval ( number_format ( floatval ( $value ["Rate"] ), 2, "", "" ) ) . ".0000";
 							} else {
 								$_vrate = "0.0000";
 							}
@@ -322,96 +334,136 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 					}
 					
 					if ($fandvid != 0) {
-						$this->_session->open ( $this->_maxurl . self::FANDVURL . strval ( $fandvid ) );
-						$e = $w->until ( function ($session) {
-							return $session->element ( 'css selector', '#subtabselector' );
-						} );
 						if ($value ["Trucks Linked"] != "0") {
 							$a = explode ( "\n", $value ["Trucks Linked"] );
-							$this->assertElementPresent ( 'css selector', '#subtabselector' );
-							$this->_session->element ( "xpath", "//*[@id='subtabselector']/select/option[text()='F and V Contracts - Truck']" )->click ();
 							foreach ( $a as $fleetnum ) {
 								if ($fleetnum != "") {
 									$truckQuery = preg_replace ( '/%t/', $fleetnum, $myquery [3] );
 									$result = $this->queryDB ( $truckQuery );
 									if (count ( $result ) != 0) {
-										$truckCount = count ( $result [0] ['ID'] );
-									} else {
-										$truckCount = 1;
-									}
-									for($z = 1; $z <= $truckCount; $z ++) {
-										$e = $w->until ( function ($session) {
-											return $session->element ( 'css selector', '#button-create' );
-										} );
-										$this->assertElementPresent ( 'css selector', '#button-create' );
-										$this->_session->element ( 'css selector', '#button-create' )->click ();
-										$e = $w->until ( function ($session) {
-											return $session->element ( 'css selector', '#udo_FandVContractTruck_link-7__0_truck_id-7' );
-										} );
-										$this->assertElementPresent ( 'css selector', '#udo_FandVContractTruck_link-7__0_truck_id-7' );
-										$this->assertElementPresent ( 'css selector', '#udo_FandVContractTruck_link-16_0_0_beginDate-16' );
-										$this->assertElementPresent ( 'css selector', '#udo_FandVContractTruck_link-17_0_0_endDate-17' );
-										$this->assertElementPresent ( 'css selector', 'input[name=save][type=submit]' );
-										$this->_session->element ( "xpath", "//*[@id='udo_FandVContractTruck_link-7__0_truck_id-7']/option[text()='" . $fleetnum . "']" )->click ();
-										$this->_session->element ( 'css selector', '#udo_FandVContractTruck_link-16_0_0_beginDate-16' )->clear ();
-										$this->_session->element ( 'css selector', '#udo_FandVContractTruck_link-17_0_0_endDate-17' )->clear ();
-										$this->_session->element ( 'css selector', '#udo_FandVContractTruck_link-16_0_0_beginDate-16' )->sendKeys ( $value ["Start Date"] );
-										$this->_session->element ( 'css selector', '#udo_FandVContractTruck_link-17_0_0_endDate-17' )->sendKeys ( $value ["End Date"] );
-										$this->_session->element ( 'css selector', 'input[name=save][type=submit]' )->click ();
+										foreach ( $result as $x ) {
+											try {
+												// : Load F and V page and goto truck links
+												$this->_session->open ( $this->_maxurl . self::FANDVURL . strval ( $fandvid ) );
+												// Wait for element = #subtabselector
+												$e = $w->until ( function ($session) {
+													return $session->element ( 'css selector', '#subtabselector' );
+												} );
+												// Select Truck Links from the selectbox
+												$this->_session->element ( "xpath", "//*[@id='subtabselector']/select/option[text()='F and V Contracts - Truck']" )->click ();
+												// : End
+												// Wait for element = #button-create
+												$e = $w->until ( function ($session) {
+													return $session->element ( 'css selector', '#button-create' );
+												} );
+												// Click element = #button-create
+												$this->_session->element ( 'css selector', '#button-create' )->click ();
+												// Wait for element = truck_id field
+												$e = $w->until ( function ($session) {
+													return $session->element ( 'css selector', '#udo_FandVContractTruck_link-7__0_truck_id-7' );
+												} );
+												// : Assert elements are present on the page
+												$this->assertElementPresent ( 'css selector', '#udo_FandVContractTruck_link-16_0_0_beginDate-16' );
+												$this->assertElementPresent ( 'css selector', '#udo_FandVContractTruck_link-17_0_0_endDate-17' );
+												$this->assertElementPresent ( 'css selector', 'input[name=save][type=submit]' );
+												// : End
+												// Select truck from selectbox
+												$this->_session->element ( "xpath", "//*[@id='udo_FandVContractTruck_link-7__0_truck_id-7']/option[text()='" . $fleetnum . "']" )->click ();
+												// : Clear begin and end date fields
+												$this->_session->element ( 'css selector', '#udo_FandVContractTruck_link-16_0_0_beginDate-16' )->clear ();
+												$this->_session->element ( 'css selector', '#udo_FandVContractTruck_link-17_0_0_endDate-17' )->clear ();
+												// : End
+												// : Insert start and end date values
+												$this->_session->element ( 'css selector', '#udo_FandVContractTruck_link-16_0_0_beginDate-16' )->sendKeys ( $value ["Start Date"] );
+												$this->_session->element ( 'css selector', '#udo_FandVContractTruck_link-17_0_0_endDate-17' )->sendKeys ( $value ["End Date"] );
+												// : End
+												// Click element = submit button
+												$this->_session->element ( 'css selector', 'input[name=save][type=submit]' )->click ();
+											} catch ( Exception $e ) {
+												$this->saveError ( $e, "ERROR: Failed to create truck link: " . $fleetnum, $key );
+											}
+										}
 									}
 								}
 							}
 						}
-						if ($value ["Routes Linked"] != "0") {
-							$a = explode ( "\n", $value ["Routes Linked"] );
-							$this->assertElementPresent ( 'css selector', '#subtabselector' );
-							$this->_session->element ( "xpath", "//*[@id='subtabselector']/select/option[text()='Routes in the F&V Contract']" )->click ();
-							$e = $w->until ( function ($session) {
-								return $session->element ( 'css selector', '#button-create' );
-							} );
-							foreach ( $a as $route ) {
-								if ($route != "") {
+					}
+					if ($value ["Routes Linked"] != "0") {
+						$a = explode ( "\n", $value ["Routes Linked"] );
+
+						foreach ( $a as $route ) {
+							if ($route != "") {
+								try {
+									
+									// : Load F and V page and goto truck links
+									$this->_session->open ( $this->_maxurl . self::FANDVURL . strval ( $fandvid ) );
+									// Wait for element = #subtabselector
+									$e = $w->until ( function ($session) {
+										return $session->element ( 'css selector', '#subtabselector' );
+									} );
+									$this->_session->element ( "xpath", "//*[@id='subtabselector']/select/option[text()='Routes in the F&V Contract']" )->click ();
+									$e = $w->until ( function ($session) {
+										return $session->element ( 'css selector', '#button-create' );
+									} );
+									// : End
+									
+									// : Use preg_match to build needed values
 									preg_match ( '/^(.*TO.*)\[/', $route, $result );
 									$route_name = $result [1];
+									
 									preg_match ( '/TO\s(.*)\[.*$/', $route, $result );
 									$fromLocation = $result [1];
+									
 									preg_match ( '/(.*)\sTO/', $route, $result );
 									$toLocation = $result [1];
+									
 									preg_match ( '/TO.*\[(.*)\]$/', $route, $result );
 									$leadKms = $result [1];
-									$this->assertElementPresent ( 'css selector', '#button-create' );
+									// : End
+
 									$this->_session->element ( 'css selector', '#button-create' )->click ();
 									$e = $w->until ( function ($session) {
 										return $session->element ( "xpath", "//*[contains(text(),'Create F and V Contracts - Route')]" );
 									} );
+									// : Assert all elements are on the page
 									$this->assertElementPresent ( 'css selector', '#udo_FandVContractRoute_link-6__0_route_id-6' );
 									$this->assertElementPresent ( 'css selector', '#udo_FandVContractRoute_link-4_0_0_leadKms-4' );
 									$this->assertElementPresent ( 'css selector', 'input[type=submit][name=save]' );
+									// : End
+									// Select the route from the selectbox
 									$this->_session->element ( "xpath", "//*[@id='udo_FandVContractRoute_link-6__0_route_id-6']/option[text()='" . $route_name . "']" )->click ();
+									// Clear the leadKms field
 									$this->_session->element ( 'css selector', '#udo_FandVContractRoute_link-4_0_0_leadKms-4' )->clear ();
 									if ($leadKms != "0") {
+										// IF leadKms is not 0 then insert the leadkms value into the leadkms field
 										$this->_session->element ( 'css selector', '#udo_FandVContractRoute_link-4_0_0_leadKms-4' )->sendKeys ( strval ( $leadKms ) );
 									}
+									// Click element = submit button
 									$this->_session->element ( 'css selector', 'input[type=submit][name=save]' )->click ();
+									
+								} catch ( Exception $e ) {
+									$this->saveError ( $e, "ERROR: Failed to create route link: " . $route_name, $key );
 								}
 							}
 						}
-						if ($this->var_rate_id != NULL) {
+					}
+					if ($this->var_rate_id != NULL) {
+						try {
+							// Load rate data page for contract
 							$this->_session->open ( $this->_maxurl . self::RATEDATAURL . $this->var_rate_id );
+							// Wait for element = #subtabselector
 							$e = $w->until ( function ($session) {
 								return $session->element ( 'css selector', '#subtabselector' );
 							} );
-							$this->assertElementPresent ( 'css selector', '#subtabselector' );
+							
 							$this->_session->element ( "xpath", "//*[@id='subtabselector']/select/option[text()='DaysPerMonth Values']" )->click ();
 							$e = $w->until ( function ($session) {
 								return $session->element ( 'css selector', '#button-create' );
 							} );
-							$this->assertElementPresent ( 'css selector', '#button-create' );
 							$this->_session->element ( 'css selector', '#button-create' )->click ();
 							$e = $w->until ( function ($session) {
 								return $session->element ( "xpath", "//*[contains(text(),'Create Date Range Values')]" );
 							} );
-							$this->assertElementPresent ( "xpath", "//*[contains(text(),'Create Date Range Values')]" );
 							$this->assertElementPresent ( 'css selector', '#DateRangeValue-2_0_0_beginDate-2' );
 							$this->assertElementPresent ( 'css selector', '#DateRangeValue-4_0_0_endDate-4' );
 							$this->assertElementPresent ( 'css selector', '#DateRangeValue-20_0_0_value-20' );
@@ -423,25 +475,31 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 							$this->_session->element ( 'css selector', '#DateRangeValue-20_0_0_value-20' )->clear ();
 							$this->_session->element ( 'css selector', '#DateRangeValue-20_0_0_value-20' )->sendKeys ( strval ( $value ["DaysPerMonth"] ) );
 							$this->_session->element ( 'css selector', 'input[name=save][type=submit]' )->click ();
-							
+						} catch ( Exception $e ) {
+							$this->saveError ( $e, "ERROR: Caught exception while creating DaysPerMonth value", $key );
+						}
+						try {
+							// Load rate data page for contract
+							$this->_session->open ( $this->_maxurl . self::RATEDATAURL . $this->var_rate_id );
+							// Wait for element = #subtabselector
 							$e = $w->until ( function ($session) {
 								return $session->element ( 'css selector', '#subtabselector' );
 							} );
-							$this->assertElementPresent ( 'css selector', '#subtabselector' );
+							
 							$this->_session->element ( "xpath", "//*[@id='subtabselector']/select/option[text()='DaysPerTrip Values']" )->click ();
 							$e = $w->until ( function ($session) {
 								return $session->element ( 'css selector', '#button-create' );
 							} );
-							$this->assertElementPresent ( 'css selector', '#button-create' );
 							$this->_session->element ( 'css selector', '#button-create' )->click ();
 							$e = $w->until ( function ($session) {
 								return $session->element ( "xpath", "//*[contains(text(),'Create Date Range Values')]" );
 							} );
-							$this->assertElementPresent ( "xpath", "//*[contains(text(),'Create Date Range Values')]" );
+							// : Assert elements are present on the page
 							$this->assertElementPresent ( 'css selector', '#DateRangeValue-2_0_0_beginDate-2' );
 							$this->assertElementPresent ( 'css selector', '#DateRangeValue-4_0_0_endDate-4' );
 							$this->assertElementPresent ( 'css selector', '#DateRangeValue-20_0_0_value-20' );
 							$this->assertElementPresent ( 'css selector', 'input[name=save][type=submit]' );
+							// : End
 							$this->_session->element ( 'css selector', '#DateRangeValue-2_0_0_beginDate-2' )->clear ();
 							$this->_session->element ( 'css selector', '#DateRangeValue-2_0_0_beginDate-2' )->sendKeys ( strval ( $value ["Start Date"] ) );
 							$this->_session->element ( 'css selector', '#DateRangeValue-4_0_0_endDate-4' )->clear ();
@@ -449,21 +507,25 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 							$this->_session->element ( 'css selector', '#DateRangeValue-20_0_0_value-20' )->clear ();
 							$this->_session->element ( 'css selector', '#DateRangeValue-20_0_0_value-20' )->sendKeys ( strval ( $value ["DaysPerTrip"] ) );
 							$this->_session->element ( 'css selector', 'input[name=save][type=submit]' )->click ();
-							
+						} catch ( Exception $e ) {
+							$this->saveError ( $e, "ERROR: Caught exception while creating DaysPerTrip value", $key );
+						}
+						try {
+							// Load rate data page for contract
+							$this->_session->open ( $this->_maxurl . self::RATEDATAURL . $this->var_rate_id );
+							// Wait for element = #subtabselector
 							$e = $w->until ( function ($session) {
 								return $session->element ( 'css selector', '#subtabselector' );
 							} );
-							$this->assertElementPresent ( 'css selector', '#subtabselector' );
+							
 							$this->_session->element ( "xpath", "//*[@id='subtabselector']/select/option[text()='ExpectedDistance Values']" )->click ();
 							$e = $w->until ( function ($session) {
 								return $session->element ( 'css selector', '#button-create' );
 							} );
-							$this->assertElementPresent ( 'css selector', '#button-create' );
 							$this->_session->element ( 'css selector', '#button-create' )->click ();
 							$e = $w->until ( function ($session) {
 								return $session->element ( "xpath", "//*[contains(text(),'Create Date Range Values')]" );
 							} );
-							$this->assertElementPresent ( "xpath", "//*[contains(text(),'Create Date Range Values')]" );
 							$this->assertElementPresent ( 'css selector', '#DateRangeValue-2_0_0_beginDate-2' );
 							$this->assertElementPresent ( 'css selector', '#DateRangeValue-4_0_0_endDate-4' );
 							$this->assertElementPresent ( 'css selector', '#DateRangeValue-20_0_0_value-20' );
@@ -475,21 +537,25 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 							$this->_session->element ( 'css selector', '#DateRangeValue-20_0_0_value-20' )->clear ();
 							$this->_session->element ( 'css selector', '#DateRangeValue-20_0_0_value-20' )->sendKeys ( strval ( $value ["ExpectedDistance"] ) );
 							$this->_session->element ( 'css selector', 'input[name=save][type=submit]' )->click ();
-							
+						} catch ( Exception $e ) {
+							$this->saveError ( $e, "ERROR: Caught exception while creating ExpectedDistance value", $key );
+						}
+						
+						try {
+							// Load rate data page for contract
+							$this->_session->open ( $this->_maxurl . self::RATEDATAURL . $this->var_rate_id );
+							// Wait for element = #subtabselector
 							$e = $w->until ( function ($session) {
 								return $session->element ( 'css selector', '#subtabselector' );
 							} );
-							$this->assertElementPresent ( 'css selector', '#subtabselector' );
 							$this->_session->element ( "xpath", "//*[@id='subtabselector']/select/option[text()='ExpectedEmptyKms Values']" )->click ();
 							$e = $w->until ( function ($session) {
 								return $session->element ( 'css selector', '#button-create' );
 							} );
-							$this->assertElementPresent ( 'css selector', '#button-create' );
 							$this->_session->element ( 'css selector', '#button-create' )->click ();
 							$e = $w->until ( function ($session) {
 								return $session->element ( "xpath", "//*[contains(text(),'Create Date Range Values')]" );
 							} );
-							$this->assertElementPresent ( "xpath", "//*[contains(text(),'Create Date Range Values')]" );
 							$this->assertElementPresent ( 'css selector', '#DateRangeValue-2_0_0_beginDate-2' );
 							$this->assertElementPresent ( 'css selector', '#DateRangeValue-4_0_0_endDate-4' );
 							$this->assertElementPresent ( 'css selector', '#DateRangeValue-20_0_0_value-20' );
@@ -501,25 +567,32 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 							$this->_session->element ( 'css selector', '#DateRangeValue-20_0_0_value-20' )->clear ();
 							$this->_session->element ( 'css selector', '#DateRangeValue-20_0_0_value-20' )->sendKeys ( strval ( $value ["ExpectedEmptyKms"] ) );
 							$this->_session->element ( 'css selector', 'input[name=save][type=submit]' )->click ();
-							
+						} catch ( Exception $e ) {
+							$this->saveError ( $e, "ERROR: Caught exception while creating ExpectedEmptyKms value", $key );
+						}
+						
+						try {
+							// Load rate data page for contract
+							$this->_session->open ( $this->_maxurl . self::RATEDATAURL . $this->var_rate_id );
+							// Wait for element = #subtabselector
 							$e = $w->until ( function ($session) {
 								return $session->element ( 'css selector', '#subtabselector' );
 							} );
-							$this->assertElementPresent ( 'css selector', '#subtabselector' );
+							
 							$this->_session->element ( "xpath", "//*[@id='subtabselector']/select/option[text()='Fleet Values']" )->click ();
 							$e = $w->until ( function ($session) {
 								return $session->element ( 'css selector', '#button-create' );
 							} );
-							$this->assertElementPresent ( 'css selector', '#button-create' );
 							$this->_session->element ( 'css selector', '#button-create' )->click ();
 							$e = $w->until ( function ($session) {
 								return $session->element ( "xpath", "//*[contains(text(),'Create Date Range Values')]" );
 							} );
-							$this->assertElementPresent ( "xpath", "//*[contains(text(),'Create Date Range Values')]" );
+							// : Assert elements are present on the page
 							$this->assertElementPresent ( 'css selector', '#DateRangeValue-2_0_0_beginDate-2' );
 							$this->assertElementPresent ( 'css selector', '#DateRangeValue-4_0_0_endDate-4' );
 							$this->assertElementPresent ( 'css selector', '#DateRangeValue-20__0_value-20' );
 							$this->assertElementPresent ( 'css selector', 'input[name=save][type=submit]' );
+							// : End
 							$this->_session->element ( 'css selector', '#DateRangeValue-2_0_0_beginDate-2' )->clear ();
 							$this->_session->element ( 'css selector', '#DateRangeValue-2_0_0_beginDate-2' )->sendKeys ( $value ["Start Date"] );
 							$this->_session->element ( 'css selector', '#DateRangeValue-4_0_0_endDate-4' )->clear ();
@@ -533,25 +606,32 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 								$this->assertElementPresent ( 'css selector', 'input[type=submit][name=abort]' );
 								$this->_session->element ( 'css selector', 'input[type=submit][name=abort]' )->click ();
 							}
-							
+						} catch ( Exception $e ) {
+							$this->saveError ( $e, "ERROR: Caught exception while creating Fleet value", $key );
+						}
+						
+						try {
+							// Load rate data page for contract
+							$this->_session->open ( $this->_maxurl . self::RATEDATAURL . $this->var_rate_id );
+							// Wait for element = #subtabselector
 							$e = $w->until ( function ($session) {
 								return $session->element ( 'css selector', '#subtabselector' );
 							} );
-							$this->assertElementPresent ( 'css selector', '#subtabselector' );
+							
 							$this->_session->element ( "xpath", "//*[@id='subtabselector']/select/option[text()='FuelConsumptionForRoute Values']" )->click ();
 							$e = $w->until ( function ($session) {
 								return $session->element ( 'css selector', '#button-create' );
 							} );
-							$this->assertElementPresent ( 'css selector', '#button-create' );
 							$this->_session->element ( 'css selector', '#button-create' )->click ();
 							$e = $w->until ( function ($session) {
 								return $session->element ( "xpath", "//*[contains(text(),'Create Date Range Values')]" );
 							} );
-							$this->assertElementPresent ( "xpath", "//*[contains(text(),'Create Date Range Values')]" );
+							// : Assert elements are present on the page
 							$this->assertElementPresent ( 'css selector', '#DateRangeValue-2_0_0_beginDate-2' );
 							$this->assertElementPresent ( 'css selector', '#DateRangeValue-4_0_0_endDate-4' );
 							$this->assertElementPresent ( 'css selector', '#DateRangeValue-20_0_0_value-20' );
 							$this->assertElementPresent ( 'css selector', 'input[name=save][type=submit]' );
+							// : End
 							$this->_session->element ( 'css selector', '#DateRangeValue-2_0_0_beginDate-2' )->clear ();
 							$this->_session->element ( 'css selector', '#DateRangeValue-2_0_0_beginDate-2' )->sendKeys ( strval ( $value ["Start Date"] ) );
 							$this->_session->element ( 'css selector', '#DateRangeValue-4_0_0_endDate-4' )->clear ();
@@ -562,25 +642,17 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 							$e = $w->until ( function ($session) {
 								return $session->element ( 'css selector', '#subtabselector' );
 							} );
+						} catch ( Exception $e ) {
+							$this->saveError ( $e, "ERROR: Caught exception while creating FuelConsumption value", $key );
 						}
 					}
 				} catch ( Exception $e ) {
-					echo "Error: " . $e->getMessage () . PHP_EOL;
-					echo "Time of error: " . date ( "Y-m-d H:i:s" ) . PHP_EOL;
-					echo "Last record: " . $this->lastRecord;
-					$this->takeScreenshot ();
-					$_erCount = count ( $this->_error );
-					$this->_error [$_erCount + 1] ["error"] = $e->getMessage ();
-					foreach ( $FandVData as $key => $value ) {
-						foreach ( $value as $_key => $_value ) {
-							$this->_error [$_erCount + 1] [$_key] = $_value [$_key];
-						}
-					}
+					$this->saveError ( $e, "ERROR: Caught in main loop.", $key );
 				}
 			}
 			// : If errors occured. Create xls of entries that failed.
 			if (count ( $this->_error ) != 0) {
-				$_xlsfilename = (dirname ( __FILE__ ) . self::DS . "error_reports" . self::DS . date ( "Y-m-d_His_" ) . "MAXLiveFandV.xlsx");
+				$_xlsfilename = (dirname ( __FILE__ ) . $this->_errDir . self::DS . date ( "Y-m-d_His_" ) . "_MAXLiveFandV.xlsx");
 				$this->writeExcelFile ( $_xlsfilename, $this->_error, $_xlsColumns );
 				if (file_exists ( $_xlsfilename )) {
 					print ("Excel error report written successfully to file: $_xlsfilename") ;
@@ -654,8 +726,21 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 		try {
 			$result = $this->_db->query ( $sqlquery );
 			return $result->fetchAll ( PDO::FETCH_ASSOC );
-		} catch ( PDOException $ex ) {
-			return FALSE;
+		} catch ( PDOException $ex1 ) {
+			try {
+				// Disconnect from database
+				$this->_db = null;
+				// : Reconnect to database
+				$_mysqlDsn = preg_replace ( "/%s/", $this->_ip, $this->_dbdsn );
+				$this->openDB ( $_mysqlDsn, $this->_dbuser, $this->_dbpwd, $this->_dboptions );
+				// : End
+				// Reattempt to run query
+				$result = $this->_db->query ( $sqlquery );
+				// Return result
+				return $result->fetchAll ( PDO::FETCH_ASSOC );
+			} catch (PDOException $ex2) {
+				return FALSE;
+			}
 		}
 	}
 	
@@ -668,12 +753,30 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 	private function takeScreenshot() {
 		$_img = $this->_session->screenshot ();
 		$_data = base64_decode ( $_img );
-		$_file = dirname ( __FILE__ ) . DIRECTORY_SEPARATOR . "Screenshots" . DIRECTORY_SEPARATOR . date ( "Y-m-d_His" ) . "_WebDriver.png";
+		$_file = dirname ( __FILE__ ) . $this->_scrDir . DIRECTORY_SEPARATOR . date ( "Y-m-d_His" ) . "_F&VContracts.png";
 		$_success = file_put_contents ( $_file, $_data );
 		if ($_success) {
 			return $_file;
 		} else {
 			return FALSE;
+		}
+	}
+	
+	/**
+	 * MAXLive_CreateFandVContracts::saveError($_error, $_message, $_key)
+	 * Add error message and lastRecord to error array to keep record
+	 * of all errors that occur during runtime of script
+	 *
+	 * @param object: $_error        	
+	 * @param string: $_message
+	 * @param integer: $_key
+	 */
+	private function saveError($_error, $_message, $_key) {
+		$this->takeScreenshot ();
+		$_erCount = count ( $this->_error );
+		$this->_error [$_erCount + 1] ["Error_Message"] = $_message . PHP_EOL . $_error->getMessage ();
+		foreach ( $this->_data[$_key] as $key => $value ) {
+			$this->_error [$_erCount + 1] [$key] = $value;
 		}
 	}
 	
