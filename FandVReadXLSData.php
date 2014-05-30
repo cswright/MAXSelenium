@@ -3,7 +3,6 @@
 error_reporting (E_ALL);
 
 // : Includes
-include_once 'PHPUnit/Extensions/PHPExcel/Classes/PHPExcel.php';
 
 // : End
 
