@@ -45,7 +45,8 @@ class MAXLive_Route_Missing_Distance extends PHPUnit_Framework_TestCase {
 	protected $to = 'clintonabco@gmail.com';
 	protected $subject = 'MAX Selenium script report';
 	protected $message;
-	protected $_error = array ();
+	protected $_errors = array ();
+	protected $_processed = array ();
 	protected $_dataDir;
 	protected $_maxurl;
 	protected $_mode;
@@ -68,7 +69,7 @@ class MAXLive_Route_Missing_Distance extends PHPUnit_Framework_TestCase {
 			PDO::ATTR_PERSISTENT => true 
 	);
 	protected $_myqueries = array (
-			"SELECT ID, expectedDistance, duration FROM udo_route WHERE ID=%s;"
+			"SELECT ID, expectedKms, duration FROM udo_route WHERE ID=%s;" 
 	);
 	
 	// : Public Functions
@@ -82,7 +83,6 @@ class MAXLive_Route_Missing_Distance extends PHPUnit_Framework_TestCase {
 	 */
 	public function __construct() {
 		$ini = dirname ( realpath ( __FILE__ ) ) . self::DS . self::INI_DIR . self::DS . self::INI_FILE;
-		echo $ini;
 		if (is_file ( $ini ) === FALSE) {
 			echo "No " . self::INI_FILE . " file found. Please create it and populate it with the following data: username=x@y.com, password=`your password`, your name shown on MAX the welcome page welcome=`Joe Soap` and mode=`test` or `live`" . PHP_EOL;
 			return FALSE;
@@ -98,7 +98,7 @@ class MAXLive_Route_Missing_Distance extends PHPUnit_Framework_TestCase {
 			$this->_mode = $data ["mode"];
 			$this->_ip = $data ["ip"];
 			$this->_wdport = $data ["wdport"];
-			$this->_browser = $data["browser"];
+			$this->_browser = $data ["browser"];
 			$this->_xls = $data ["xls"];
 			switch ($this->_mode) {
 				case "live" :
@@ -124,13 +124,13 @@ class MAXLive_Route_Missing_Distance extends PHPUnit_Framework_TestCase {
 	// : End
 	public function setUp() {
 		$wd_host = "http://localhost:$this->_wdport/wd/hub";
-		self::$driver = new PHPWebDriver_WebDriver ($wd_host);
+		self::$driver = new PHPWebDriver_WebDriver ( $wd_host );
 		$this->_session = self::$driver->session ( $this->_browser );
 	}
 	
-	//: Setters
+	// : Setters
 	public function SetcURLTimeout($_Timeout) {
-		if (is_int($_Timeout)) {
+		if (is_int ( $_Timeout )) {
 			$this->_cURLTimeout = $_Timeout;
 			return TRUE;
 		} else {
@@ -140,7 +140,6 @@ class MAXLive_Route_Missing_Distance extends PHPUnit_Framework_TestCase {
 	// : End
 	
 	// : Getters
-	
 	public function GetcURLTimeout() {
 		return $this->_cURLTimeout;
 	}
@@ -155,123 +154,175 @@ class MAXLive_Route_Missing_Distance extends PHPUnit_Framework_TestCase {
 		
 		// Initiate Session
 		$session = $this->_session;
-		$this->_session->setPageLoadTimeout ( 60 );
+		$this->_session->setPageLoadTimeout ( 120 );
 		$w = new PHPWebDriver_WebDriverWait ( $this->_session );
 		
 		// Construct an array with the customer names to use with script
 		$rate_id = ( string ) "";
 		
-		$_xlsfile = dirname(realpath(__FILE__)) . self::DS . $this->_dataDir . self::DS . $this->_xls;
+		$_xlsfile = dirname ( realpath ( __FILE__ ) ) . self::DS . $this->_dataDir . self::DS . $this->_xls;
 		
-		if (file_exists($_xlsfile)) {
-		
-
-		try {
-			// : Load XLS data
-			$_xlsData = new ReadExcelFile($_xlsfile, "Sheet1");
-			$_data = $_xlsData->getData();
+		if (file_exists ( $_xlsfile )) {
 			
-			$_test = $this->getGoogleMapsDirectionsAPIData($_data["LocationFrom"][1] . " " . $data["ParentFrom"][1], $_data["LocationTo"][1] . " " . $data["ParentTo"][1], "true", "driving");
-			print_r($_test);
-		
-			exit;
-
-			// Connect to database
-			$_mysqlDsn = preg_replace ( "/%s/", $this->_ip, $this->_dbdsn );
-			$this->openDB ( $_mysqlDsn, $this->_dbuser, $this->_dbpwd, $this->_dboptions );
-			
-			// : Login			
-			$this->_session->open ( $this->_maxurl );
-			// : Wait for page to load and for elements to be present on page
-			if ($this->_mode == "live") {
-				$e = $w->until ( function ($session) {
-					return $session->element ( 'css selector', "#contentFrame" );
-				} );
-				$iframe = $this->_session->element ( 'css selector', '#contentFrame' );
-				$this->_session->switch_to_frame ( $iframe );
-			}
-			$e = $w->until ( function ($session) {
-				return $session->element ( 'css selector', 'input[id=identification]' );
-			} );
-			// : End
-			$this->assertElementPresent ( 'css selector', 'input[id=identification]' );
-			$this->assertElementPresent ( 'css selector', 'input[id=password]' );
-			$this->assertElementPresent ( 'css selector', 'input[name=submit][type=submit]' );
-			$e->sendKeys ( $this->_username );
-			$e = $this->_session->element ( 'css selector', 'input[id=password]' );
-			$e->sendKeys ( $this->_password );
-			$e = $this->_session->element ( 'css selector', 'input[name=submit][type=submit]' );
-			$e->click ();
-			// Switch out of frame
-			if ($this->_mode == "live") {
-				$this->_session->switch_to_frame ();
-			}
-			
-			// : Wait for page to load and for elements to be present on page
-			if ($this->_mode == "live") {
-				$e = $w->until ( function ($session) {
-					return $session->element ( 'css selector', "#contentFrame" );
-				} );
-				$iframe = $this->_session->element ( 'css selector', '#contentFrame' );
-				$this->_session->switch_to_frame ( $iframe );
-			}
-			$e = $w->until ( function ($session) {
-				return $session->element ( "xpath", "//*[text()='" . $this->_welcome . "']" );
-			} );
-			$this->assertElementPresent ( "xpath", "//*[text()='" . $this->_welcome . "']" );
-			// Switch out of frame
-			if ($this->_mode == "live") {
-				$this->_session->switch_to_frame ();
-			}
-			
-			// : IT STARTS
-			
-			
-
-			$_total = count($_data["ID"]);
-			if ($_total != 0) {
-				for($x = 1; $x <= $_total; $x++) {
-					$this->_session->open($this->_maxurl . self::ROUTES_URL . $_data["ID"][$x]);
+			try {
+				// : Load XLS data
+				$_xlsData = new ReadExcelFile ( $_xlsfile, "Sheet1" );
+				$_data = $_xlsData->getData ();
+				
+				// Connect to database
+				$_mysqlDsn = preg_replace ( "/%s/", $this->_ip, $this->_dbdsn );
+				$this->openDB ( $_mysqlDsn, $this->_dbuser, $this->_dbpwd, $this->_dboptions );
+				
+				// : Login
+				try {
+					// Load MAX home page
+					$this->_session->open ( $this->_maxurl );
+					// : Wait for page to load and for elements to be present on page
+					if ($this->_mode == "live") {
+						$e = $w->until ( function ($session) {
+							return $session->element ( 'css selector', "#contentFrame" );
+						} );
+						$iframe = $this->_session->element ( 'css selector', '#contentFrame' );
+						$this->_session->switch_to_frame ( $iframe );
+					}
 					$e = $w->until ( function ($session) {
-						return $session->element ( "css selector", ".toolbar-cell-update" );
+						return $session->element ( 'css selector', 'input[id=identification]' );
 					} );
-					$this->_session->element( "css selector", ".toolbar-cell-update" )->click();
-					$e = $w->until ( function ($session) {
-						return $session->element ( "xpath", "//*[@id='udo_Route-4_0_0_expectedKms-4']" );
-					} );
-					// : Assert all elements are on the page
-					$this->assertElementPresent("xpath", "//*[@id='udo_Route-6__0_locationFrom_id-6']");
-					$this->assertElementPresent("xpath", "//*[@id='udo_Route-7__0_locationTo_id-7']");
-					$this->assertElementPresent("xpath", "//*[@id='udo_Route-3_0_0_duration-3']");
-					$this->assertElementPresent("css selector", "input[name=save][type=submit]");
 					// : End
+					$this->assertElementPresent ( 'css selector', 'input[id=identification]' );
+					$this->assertElementPresent ( 'css selector', 'input[id=password]' );
+					$this->assertElementPresent ( 'css selector', 'input[name=submit][type=submit]' );
+					$e->sendKeys ( $this->_username );
+					$e = $this->_session->element ( 'css selector', 'input[id=password]' );
+					$e->sendKeys ( $this->_password );
+					$e = $this->_session->element ( 'css selector', 'input[name=submit][type=submit]' );
+					$e->click ();
+					// Switch out of frame
+					if ($this->_mode == "live") {
+						$this->_session->switch_to_frame ();
+					}
 					
-					$this->_session->element("xpath", "//*[@id='udo_Route-4_0_0_expectedKms-4']")->clear();
-					$this->_session->element("xpath", "//*[@id='udo_Route-3_0_0_duration-3']")->clear();
+					// : Wait for page to load and for elements to be present on page
+					if ($this->_mode == "live") {
+						$e = $w->until ( function ($session) {
+							return $session->element ( 'css selector', "#contentFrame" );
+						} );
+						$iframe = $this->_session->element ( 'css selector', '#contentFrame' );
+						$this->_session->switch_to_frame ( $iframe );
+					}
+					$e = $w->until ( function ($session) {
+						return $session->element ( "xpath", "//*[text()='" . $this->_welcome . "']" );
+					} );
+					$this->assertElementPresent ( "xpath", "//*[text()='" . $this->_welcome . "']" );
+					// Switch out of frame
+					if ($this->_mode == "live") {
+						$this->_session->switch_to_frame ();
+					}
 					
-					$this->_session->element("xpath", "//*[@id='udo_Route-4_0_0_expectedKms-4']")->sendKeys();
-					$this->_session->element("xpath", "//*[@id='udo_Route-3_0_0_duration-3']")->sendKeys();
-					$this->_session->element("css selector", "input[name=save][type=submit]")->click();
-					
+					// : Load Planningboard to rid of iframe loading on every page from here on
+					$this->_session->open ( $this->_maxurl . self::PB_URL );
+					$e = $w->until ( function ($session) {
+						return $session->element ( "xpath", "//*[contains(text(),'You Are Here') and contains(text(), 'Planningboard')]" );
+					} );
+					// : End
+				} catch ( Exception $e ) {
+					throw new Exception ( "Error: Failed to log into MAX." . PHP_EOL . $e->getMessage () );
 				}
+				// : End
+				
+				// : Main Loop
+				$_duration = ( int ) 0;
+				
+				$_total = count ( $_data ["ID"] );
+				if ($_total != 0) {
+					for($x = 1; $x <= $_total; $x ++) {
+						
+						try {
+							
+							$_sqlquery = preg_replace ( "/%s/", $_data ["ID"] [$x], $this->_myqueries[0] );
+							$_result = $this->queryDB ( $_sqlquery );
+							if (count ( $_result ) != 0) {
+								$_distance = $_result [0] ["expectedKms"];
+								if ($_distance == "0.00") {
+									$_from = "";
+									$_to = "";
+									$_distance = "";
+									$_duration = 0;
+									if ($_data ["LocationFrom"] [$x]) {
+										$_from = $_data ["LocationFrom"] [$x];
+									}
+									if ($_data ["ParentFrom"] [$x]) {
+										$_from .= " " . $_data ["ParentFrom"] [$x];
+									}
+									if ($_data ["LocationTo"] [$x]) {
+										$_to = $_data ["LocationTo"] [$x];
+									}
+									if ($_data ["ParentTo"] [$x]) {
+										$_to .= " " . $_data ["ParentTo"] [$x];
+									}
+									$_test = $this->getGoogleMapsDirectionsAPIData ( $_from, $_to, "false", "driving" );
+									if (count ( $_test ["routes"] [0] ["legs"] [0] ["distance"] ) > 0) {
+										$_distance = $_test ["routes"] [0] ["legs"] [0] ["distance"] ["text"];
+										$_distance = preg_replace ( "/\skm$/", "", $_distance );
+										$_duration = number_format ( ((floatval ( $_distance ) / 80) * 60), 0, "", "" );
+									} else {
+										throw new Exception ( "ERROR: Distance not found using Google API for record: " . $_data ["ID"] [$x] );
+									}
+									
+									$this->_session->open ( $this->_maxurl . self::ROUTE_URL . $_data ["ID"] [$x] );
+									$e = $w->until ( function ($session) {
+										return $session->element ( "css selector", ".toolbar-cell-update" );
+									} );
+									$this->_session->element ( "css selector", ".toolbar-cell-update" )->click ();
+									$e = $w->until ( function ($session) {
+										return $session->element ( "xpath", "//*[@id='udo_Route-4_0_0_expectedKms-4']" );
+									} );
+									// : Assert all elements are on the page
+									$this->assertElementPresent ( "xpath", "//*[@id='udo_Route-6__0_locationFrom_id-6']" );
+									$this->assertElementPresent ( "xpath", "//*[@id='udo_Route-7__0_locationTo_id-7']" );
+									$this->assertElementPresent ( "xpath", "//*[@id='udo_Route-3_0_0_duration-3']" );
+									$this->assertElementPresent ( "css selector", "input[name=save][type=submit]" );
+									// : End
+									
+									if (($_duration > 0) && ($_distance != "")) {
+										$this->_session->element ( "xpath", "//*[@id='udo_Route-4_0_0_expectedKms-4']" )->clear ();
+										$this->_session->element ( "xpath", "//*[@id='udo_Route-3_0_0_duration-3']" )->clear ();
+										
+										$this->_session->element ( "xpath", "//*[@id='udo_Route-4_0_0_expectedKms-4']" )->sendKeys ( $_distance );
+										$this->_session->element ( "xpath", "//*[@id='udo_Route-3_0_0_duration-3']" )->sendKeys ( strval ( $_duration ) );
+									}
+									$this->_session->element ( "css selector", "input[name=save][type=submit]" )->click ();
+									
+									$this->_processed [$x] ["Record"] = $_data ["ID"] [$x];
+									$this->_processed [$x] ["Distance"] = $_distance;
+									$this->_processed [$x] ["Duration"] = stval ( $_duration );
+								} else {
+									throw new Exception ("ERROR: Route already has distance saved.");
+								}
+							}
+							else {
+								throw new Exception ("ERROR: Route with ID not found");
+							}
+						} catch ( Exception $e ) {
+							$_errCount = count ( $this->_errors ) + 1;
+							$this->_errors [$_errCount] ["Message"] = $e->getMessage ();
+							$this->_errors [$_errCount] ["Record"] = $_data ["ID"] [$x];
+						}
+					}
+				}
+				
+				// : End
+			} catch ( Exception $e ) {
+				throw new Exception ( "Something went wrong when attempting to log into MAX, see error message below." . PHP_EOL . $e->getMessage () );
 			}
-			
-			// : THE END OF THE CIRCLE OF LIFE
-			
-		} catch ( Exception $e ) {
-			throw new Exception ("Something went wrong when attempting to log into MAX, see error message below." . PHP_EOL . $e->getMessage());
+			// : End
 		}
-		// : End
+		if (count ( $this->_errors ) != 0) {
+			print_r ( $this->_errors );
+		}
 		
-	}
-		
-		// : Load Planningboard to rid of iframe loading on every page from here on
-		$this->_session->open ( $this->_maxurl . self::PB_URL );
-		$e = $w->until ( function ($session) {
-			return $session->element ( "xpath", "//*[contains(text(),'You Are Here') and contains(text(), 'Planningboard')]" );
-		} );
-		// : End
-		
+		print (PHP_EOL) ;
+		print_r ( $this->_processed );
 		
 		// : Tear Down
 		$this->_session->element ( 'xpath', "//*[contains(@href,'/logout')]" )->click ();
@@ -450,35 +501,32 @@ class MAXLive_Route_Missing_Distance extends PHPUnit_Framework_TestCase {
 			return FALSE;
 		}
 	}
-	
 	private function getGoogleMapsDirectionsAPIData($origin, $destination, $alternatives, $mode) {
-	
-		$origin = urlencode($origin);
-		$destination = urlencode($destination);
-		$alternatives = urlencode($alternatives);
-		$mode = urlencode($mode);
+		$origin = urlencode ( $origin );
+		$destination = urlencode ( $destination );
+		$alternatives = urlencode ( $alternatives );
+		$mode = urlencode ( $mode );
 		$url = "http://maps.googleapis.com/maps/api/directions/json?origin=$origin&destination=$destination&alternatives=$alternatives&mode=$mode";
+		
 		// create curl resource
-		$ch = curl_init();
+		$ch = curl_init ();
 		// set url
-		curl_setopt($ch, CURLOPT_URL, $url);
-		//return the transfer as a string
-		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+		curl_setopt ( $ch, CURLOPT_URL, $url );
+		// return the transfer as a string
+		curl_setopt ( $ch, CURLOPT_RETURNTRANSFER, 1 );
 		
 		// $output contains the output string
-		$output = curl_exec($ch);
+		$output = curl_exec ( $ch );
 		
 		// close curl resource to free up system resources
-		curl_close($ch);
+		curl_close ( $ch );
 		
-		$_result = json_decode($output, TRUE);
-		if (count($_result) != 0) {
+		$_result = json_decode ( $output, TRUE );
+		if (count ( $_result ) != 0) {
 			return $_result;
-		}
-		else {
+		} else {
 			return FALSE;
 		}
-		
 	}
 	
 	// : End
