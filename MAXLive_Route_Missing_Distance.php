@@ -60,6 +60,12 @@ class MAXLive_Route_Missing_Distance extends PHPUnit_Framework_TestCase {
 	protected $_dbdsn = "mysql:host=%s;dbname=max2;charset=utf8;";
 	protected $_dbuser = "root";
 	protected $_dbpwd = "kaluma";
+	protected $_cURLTimeout = 1000;
+	protected $_cURLUserPassword;
+	protected $_Fields = array (
+			"event" => "message",
+			"content" => ""
+	);
 	protected $_dboptions = array (
 			PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8',
 			PDO::ATTR_EMULATE_PREPARES => false,
@@ -126,6 +132,53 @@ class MAXLive_Route_Missing_Distance extends PHPUnit_Framework_TestCase {
 		self::$driver = new PHPWebDriver_WebDriver ($wd_host);
 		$this->_session = self::$driver->session ( $this->_browser );
 	}
+	
+	//: Setters
+	public function SetcURLTimeout($_Timeout) {
+		if (is_int($_Timeout)) {
+			$this->_cURLTimeout = $_Timeout;
+			return TRUE;
+		} else {
+			return FALSE;
+		}
+	}
+	
+	public function SetMessage($_Message) {
+		if (is_string($_Message)) {
+			$this->_Fields["content"] = $_Message;
+			return TRUE;
+		} else {
+			return FALSE;
+		}
+	}
+	
+	public function SetAllocatedTime($_Duration, $_Type) {
+		if (is_int($_Duration) && is_string($_Type) && (($_Type === "hours") || ($_Type === "minutes"))) {
+			$this->_AllocateTime["duration"] = $_Duration;
+			$this->_AllocateTime["type"] = $_Type;
+			return TRUE;
+		} else {
+			return FALSE;
+		}
+	}
+	
+	public function SetcURLUserPassword($_userPass)	{
+		if (is_string($_userPass) && (strpos($_userPass, ":") != FALSE)) {
+			$this->_cURLUserPassword = $_userPass;
+			return TRUE;
+		} else {
+			return FALSE;
+		}
+	}
+	// : End
+	
+	// : Getters
+	
+	public function GetcURLTimeout() {
+		return $this->_cURLTimeout;
+	}
+	
+	// : End
 	
 	/**
 	 * MAXLive_Route_Missing_Distance::testFunctionTemplate
@@ -426,6 +479,53 @@ class MAXLive_Route_Missing_Distance extends PHPUnit_Framework_TestCase {
 		} catch ( PDOException $ex ) {
 			return FALSE;
 		}
+	}
+	
+	//: Private Functions
+	public function parseURL() {
+		// Open connection
+		$ch = curl_init();
+		//: Submit POST request to send message to hubot
+		//: Setup the cURL Options
+		curl_setopt($ch,CURLOPT_URL, self::FLOW_URL);
+		curl_setopt($ch, CURLOPT_HEADER, false);
+		curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+		curl_setopt($ch, CURLOPT_USERPWD, $this->_cURLUserPassword);
+		curl_setopt($ch,CURLOPT_POST, true);
+		curl_setopt($ch,CURLOPT_POSTFIELDS, $this->_Fields);
+		curl_setopt($ch, CURLOPT_TIMEOUT, $this->GetcURLTimeout());
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+		if (isset($_SERVER['HTTP_USER_AGENT']) && $_SERVER['HTTP_USER_AGENT']) {
+			curl_setopt($ch, CURLOPT_USERAGENT, $_SERVER['HTTP_USER_AGENT']);
+		}
+		//: End
+		curl_exec($ch);
+		//: End
+	
+		//: Submit GET request to return response from hubot
+		curl_setopt($ch,CURLOPT_POST, false);
+	
+		sleep(7);
+	
+		$result = curl_exec($ch);
+	
+		$info = curl_getinfo($ch);
+		//: End
+	
+		//: Filter output to show last message from hubot
+		$result = explode("{",$result);
+		$result = preg_replace("/\}/", "", $result);
+		$result = end(preg_grep("/\"user\"\:38350/", $result));
+		$a = (strpos($result, '"content":"') + 11); $b = strpos($result, '","event":');
+		$x = $b - $a;
+		$result = substr($result,$a, $x);
+		//: End
+	
+		// Close connection
+		curl_close($ch);
+	
+		// Return message
+		return $result;
 	}
 	
 	// : End
