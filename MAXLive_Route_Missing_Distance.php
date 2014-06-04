@@ -61,11 +61,6 @@ class MAXLive_Route_Missing_Distance extends PHPUnit_Framework_TestCase {
 	protected $_dbuser = "root";
 	protected $_dbpwd = "kaluma";
 	protected $_cURLTimeout = 1000;
-	protected $_cURLUserPassword;
-	protected $_Fields = array (
-			"event" => "message",
-			"content" => ""
-	);
 	protected $_dboptions = array (
 			PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8',
 			PDO::ATTR_EMULATE_PREPARES => false,
@@ -142,34 +137,6 @@ class MAXLive_Route_Missing_Distance extends PHPUnit_Framework_TestCase {
 			return FALSE;
 		}
 	}
-	
-	public function SetMessage($_Message) {
-		if (is_string($_Message)) {
-			$this->_Fields["content"] = $_Message;
-			return TRUE;
-		} else {
-			return FALSE;
-		}
-	}
-	
-	public function SetAllocatedTime($_Duration, $_Type) {
-		if (is_int($_Duration) && is_string($_Type) && (($_Type === "hours") || ($_Type === "minutes"))) {
-			$this->_AllocateTime["duration"] = $_Duration;
-			$this->_AllocateTime["type"] = $_Type;
-			return TRUE;
-		} else {
-			return FALSE;
-		}
-	}
-	
-	public function SetcURLUserPassword($_userPass)	{
-		if (is_string($_userPass) && (strpos($_userPass, ":") != FALSE)) {
-			$this->_cURLUserPassword = $_userPass;
-			return TRUE;
-		} else {
-			return FALSE;
-		}
-	}
 	// : End
 	
 	// : Getters
@@ -185,6 +152,7 @@ class MAXLive_Route_Missing_Distance extends PHPUnit_Framework_TestCase {
 	 * This is a function description for a selenium test function
 	 */
 	public function testFunctionTemplate() {
+		
 		// Initiate Session
 		$session = $this->_session;
 		$this->_session->setPageLoadTimeout ( 60 );
@@ -203,7 +171,9 @@ class MAXLive_Route_Missing_Distance extends PHPUnit_Framework_TestCase {
 			$_xlsData = new ReadExcelFile($_xlsfile, "Sheet1");
 			$_data = $_xlsData->getData();
 			
-			
+			$_test = $this->getGoogleMapsDirectionsAPIData($_data["LocationFrom"][1] . " " . $data["ParentFrom"][1], $_data["LocationTo"][1] . " " . $data["ParentTo"][1], "true", "driving");
+			print_r($_test);
+		
 			exit;
 
 			// Connect to database
@@ -481,51 +451,34 @@ class MAXLive_Route_Missing_Distance extends PHPUnit_Framework_TestCase {
 		}
 	}
 	
-	//: Private Functions
-	public function parseURL() {
-		// Open connection
+	private function getGoogleMapsDirectionsAPIData($origin, $destination, $alternatives, $mode) {
+	
+		$origin = urlencode($origin);
+		$destination = urlencode($destination);
+		$alternatives = urlencode($alternatives);
+		$mode = urlencode($mode);
+		$url = "http://maps.googleapis.com/maps/api/directions/json?origin=$origin&destination=$destination&alternatives=$alternatives&mode=$mode";
+		// create curl resource
 		$ch = curl_init();
-		//: Submit POST request to send message to hubot
-		//: Setup the cURL Options
-		curl_setopt($ch,CURLOPT_URL, self::FLOW_URL);
-		curl_setopt($ch, CURLOPT_HEADER, false);
-		curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-		curl_setopt($ch, CURLOPT_USERPWD, $this->_cURLUserPassword);
-		curl_setopt($ch,CURLOPT_POST, true);
-		curl_setopt($ch,CURLOPT_POSTFIELDS, $this->_Fields);
-		curl_setopt($ch, CURLOPT_TIMEOUT, $this->GetcURLTimeout());
-		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-		if (isset($_SERVER['HTTP_USER_AGENT']) && $_SERVER['HTTP_USER_AGENT']) {
-			curl_setopt($ch, CURLOPT_USERAGENT, $_SERVER['HTTP_USER_AGENT']);
-		}
-		//: End
-		curl_exec($ch);
-		//: End
-	
-		//: Submit GET request to return response from hubot
-		curl_setopt($ch,CURLOPT_POST, false);
-	
-		sleep(7);
-	
-		$result = curl_exec($ch);
-	
-		$info = curl_getinfo($ch);
-		//: End
-	
-		//: Filter output to show last message from hubot
-		$result = explode("{",$result);
-		$result = preg_replace("/\}/", "", $result);
-		$result = end(preg_grep("/\"user\"\:38350/", $result));
-		$a = (strpos($result, '"content":"') + 11); $b = strpos($result, '","event":');
-		$x = $b - $a;
-		$result = substr($result,$a, $x);
-		//: End
-	
-		// Close connection
+		// set url
+		curl_setopt($ch, CURLOPT_URL, $url);
+		//return the transfer as a string
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+		
+		// $output contains the output string
+		$output = curl_exec($ch);
+		
+		// close curl resource to free up system resources
 		curl_close($ch);
-	
-		// Return message
-		return $result;
+		
+		$_result = json_decode($output, TRUE);
+		if (count($_result) != 0) {
+			return $_result;
+		}
+		else {
+			return FALSE;
+		}
+		
 	}
 	
 	// : End
