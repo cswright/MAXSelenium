@@ -248,6 +248,7 @@ class MAXLive_Route_Missing_Distance extends PHPUnit_Framework_TestCase {
 									$_to = "";
 									$_distance = "";
 									$_duration = 0;
+									$_unit = "km";
 									if ($_data ["LocationFrom"] [$x]) {
 										$_from = $_data ["LocationFrom"] [$x];
 									}
@@ -263,7 +264,15 @@ class MAXLive_Route_Missing_Distance extends PHPUnit_Framework_TestCase {
 									$_test = $this->getGoogleMapsDirectionsAPIData ( $_from, $_to, "false", "driving" );
 									if (count ( $_test ["routes"] [0] ["legs"] [0] ["distance"] ) > 0) {
 										$_distance = $_test ["routes"] [0] ["legs"] [0] ["distance"] ["text"];
-										$_distance = preg_replace ( "/\skm$/", "", $_distance );
+										preg_match("/\s(m|km)$/", $_distance, $_matches);
+										if (($_matches) && (count($_matches) > 0)) {
+											$_unit = $_matches[1];
+										}
+										$_distance = preg_replace ( "/\s.?m$/", "", $_distance );
+										$_distance = preg_replace ("/\,/", "", $_distance);
+										if ($_unit == "m") {
+											$_distance = strval(number_format((floatval($_distance) / 1000), 3, ".", "")); 
+										}
 										$_duration = number_format ( ((floatval ( $_distance ) / 80) * 60), 0, "", "" );
 									} else {
 										throw new Exception ( "ERROR: Distance not found using Google API for record: " . $_data ["ID"] [$x] );
@@ -284,7 +293,7 @@ class MAXLive_Route_Missing_Distance extends PHPUnit_Framework_TestCase {
 									$this->assertElementPresent ( "css selector", "input[name=save][type=submit]" );
 									// : End
 									
-									if (($_duration > 0) && ($_distance != "")) {
+									if (($_distance != "0.00") && ($_distance != "")) {
 										$this->_session->element ( "xpath", "//*[@id='udo_Route-4_0_0_expectedKms-4']" )->clear ();
 										$this->_session->element ( "xpath", "//*[@id='udo_Route-3_0_0_duration-3']" )->clear ();
 										
@@ -295,7 +304,7 @@ class MAXLive_Route_Missing_Distance extends PHPUnit_Framework_TestCase {
 									
 									$this->_processed [$x] ["Record"] = $_data ["ID"] [$x];
 									$this->_processed [$x] ["Distance"] = $_distance;
-									$this->_processed [$x] ["Duration"] = stval ( $_duration );
+									$this->_processed [$x] ["Duration"] = strval ( $_duration );
 								} else {
 									throw new Exception ("ERROR: Route already has distance saved.");
 								}
@@ -507,7 +516,7 @@ class MAXLive_Route_Missing_Distance extends PHPUnit_Framework_TestCase {
 		$alternatives = urlencode ( $alternatives );
 		$mode = urlencode ( $mode );
 		$url = "http://maps.googleapis.com/maps/api/directions/json?origin=$origin&destination=$destination&alternatives=$alternatives&mode=$mode";
-		
+
 		// create curl resource
 		$ch = curl_init ();
 		// set url
