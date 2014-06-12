@@ -2,6 +2,7 @@
 include_once 'PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriver.php';
 include_once 'PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriverWait.php';
 include_once 'PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriverBy.php';
+include_once 'PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriverProxy.php';
 include_once dirname ( __FILE__ ) . '/RatesReadXLSData.php';
 include_once 'PHPUnit/Extensions/PHPExcel/Classes/PHPExcel.php';
 
@@ -56,6 +57,9 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 	protected $_scrDir;
 	protected $_wdport;
 	protected $_browser;
+	protected $_ip;
+	protected $_proxyip;
+	protected $_xls;
 	protected $_modeRates;
 	protected $_modeLocations;
 	protected $_modeOffloadCustomer;
@@ -148,7 +152,11 @@ class MAXLive_NCP_Rates_Create extends PHPUnit_Framework_TestCase {
 	public function setUp() {
 		$wd_host = "http://localhost:$this->_wdport/wd/hub";
 		self::$driver = new PHPWebDriver_WebDriver ( $wd_host );
-		$this->_session = self::$driver->session ( $this->_browser );
+        $desired_capabilities = array();
+		$proxy = new PHPWebDriver_WebDriverProxy();
+		$proxy->httpProxy = $this->_proxyip;
+        $proxy->add_to_capabilities($desired_capabilities);
+		$this->_session = self::$driver->session ( $this->_browser, $desired_capabilities );
 	}
 	
 	/**
