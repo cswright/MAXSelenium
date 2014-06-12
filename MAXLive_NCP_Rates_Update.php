@@ -2,6 +2,7 @@
 include_once 'PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriver.php';
 include_once 'PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriverWait.php';
 include_once 'PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriverBy.php';
+include_once 'PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriverProxy.php';
 include_once dirname ( __FILE__ ) . '/RatesReadXLSData.php';
 include_once 'PHPUnit/Extensions/PHPExcel/Classes/PHPExcel.php';
 /**
@@ -58,7 +59,12 @@ class MAXLive_NCP_Rates_Update extends PHPUnit_Framework_TestCase {
 	protected $_dataDir;
 	protected $_errDir;
 	protected $_scrDir;
+	protected $_wdport;
+	protected $_browser;
 	protected $_maxurl;
+	protected $_ip;
+	protected $_proxyip;
+	protected $_xls;
 	protected $_error = array ();
 	protected $_db;
 	protected $_dbdsn = "mysql:host=%s;dbname=max2;charset=utf8;";
@@ -95,7 +101,7 @@ class MAXLive_NCP_Rates_Update extends PHPUnit_Framework_TestCase {
 			return FALSE;
 		}
 		$data = parse_ini_file ( $ini );
-		if ((array_key_exists ( "xls", $data ) && $data ["xls"]) && (array_key_exists ( "errordir", $data ) && $data ["errordir"]) && (array_key_exists ( "screenshotdir", $data ) && $data ["screenshotdir"]) && (array_key_exists ( "datadir", $data ) && $data ["datadir"]) && (array_key_exists ( "ip", $data ) && $data ["ip"]) && (array_key_exists ( "username", $data ) && $data ["username"]) && (array_key_exists ( "password", $data ) && $data ["password"]) && (array_key_exists ( "welcome", $data ) && $data ["welcome"]) && (array_key_exists ( "mode", $data ) && $data ["mode"])) {
+		if ((array_key_exists("ip", $data) && $data["ip"]) && (array_key_exists("proxy", $data) && $data["proxy"]) && (array_key_exists ( "wdport", $data ) && $data ["wdport"]) && (array_key_exists ( "xls", $data ) && $data ["xls"]) && (array_key_exists ( "errordir", $data ) && $data ["errordir"]) && (array_key_exists ( "screenshotdir", $data ) && $data ["screenshotdir"]) && (array_key_exists ( "datadir", $data ) && $data ["datadir"]) && (array_key_exists ( "ip", $data ) && $data ["ip"]) && (array_key_exists ( "username", $data ) && $data ["username"]) && (array_key_exists ( "password", $data ) && $data ["password"]) && (array_key_exists ( "welcome", $data ) && $data ["welcome"]) && (array_key_exists ( "mode", $data ) && $data ["mode"])) {
 			$this->_username = $data ["username"];
 			$this->_password = $data ["password"];
 			$this->_welcome = $data ["welcome"];
@@ -104,7 +110,10 @@ class MAXLive_NCP_Rates_Update extends PHPUnit_Framework_TestCase {
 			$this->_scrDir = $data ["screenshotdir"];
 			$this->_mode = $data ["mode"];
 			$this->_ip = $data ["ip"];
+			$this->_proxyip = $data ["proxy"];
 			$this->_xls = $data ["xls"];
+			$this->_wdport = $data ["wdport"];
+			$this->_browser = $data ["browser"];
 			switch ($this->_mode) {
 				case "live" :
 					$this->_maxurl = self::LIVE_URL;
@@ -133,8 +142,13 @@ class MAXLive_NCP_Rates_Update extends PHPUnit_Framework_TestCase {
 	 * Create new class object and initialize session for webdriver
 	 */
 	public function setUp() {
-		self::$driver = new PHPWebDriver_WebDriver ();
-		$this->_session = self::$driver->session ( self::TEST_SESSION );
+		$wd_host = "http://localhost:$this->_wdport/wd/hub";
+		self::$driver = new PHPWebDriver_WebDriver ( $wd_host );
+        $desired_capabilities = array();
+		$proxy = new PHPWebDriver_WebDriverProxy();
+		$proxy->httpProxy = $this->_proxyip;
+        $proxy->add_to_capabilities($desired_capabilities);
+		$this->_session = self::$driver->session ( $this->_browser, $desired_capabilities );
 	}
 	
 	/**
@@ -158,7 +172,7 @@ class MAXLive_NCP_Rates_Update extends PHPUnit_Framework_TestCase {
 			try {
 				// Initiate Session
 				$session = $this->_session;
-				$this->_session->setPageLoadTimeout ( 60 );
+				$this->_session->setPageLoadTimeout ( 120 );
 				$w = new PHPWebDriver_WebDriverWait ( $this->_session );
 				
 				// : Extract columns from the spreadsheet data
@@ -316,6 +330,7 @@ class MAXLive_NCP_Rates_Update extends PHPUnit_Framework_TestCase {
 					$myQuery = preg_replace ( "/%b/", $bunit_id, $myQuery );
 					$myQuery = preg_replace ( "/%r/", $rateType_id, $myQuery );
 					$result = $this->queryDB ( $myQuery );
+					
 					if (count ( $result ) != 0) {
 						foreach ( $result as $_rateRecord ) {
 							try {
