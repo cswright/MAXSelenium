@@ -2,6 +2,7 @@
 include_once 'PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriver.php';
 include_once 'PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriverWait.php';
 include_once 'PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriverBy.php';
+include_once 'PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriverProxy.php';
 include_once dirname ( __FILE__ ) . '/ReadExcelFile.php';
 include_once 'PHPUnit/Extensions/PHPExcel/Classes/PHPExcel.php';
 /**
@@ -61,6 +62,11 @@ class MAXLive_NCP_DateRangeValue_Update extends PHPUnit_Framework_TestCase {
 	protected $_modeUpdates;
 	protected $_modeLocations;
 	protected $_maxurl;
+	protected $_wdport;
+	protected $_xls;
+	protected $_browser;
+	protected $_ip;
+	protected $_proxyip;
 	protected $_error = array ();
 	protected $_db;
 	protected $_dbdsn = "mysql:host=%s;dbname=max2;charset=utf8;";
@@ -106,7 +112,10 @@ class MAXLive_NCP_DateRangeValue_Update extends PHPUnit_Framework_TestCase {
 			$this->_scrDir = $data ["screenshotdir"];
 			$this->_mode = $data ["mode"];
 			$this->_ip = $data ["ip"];
+			$this->_proxyip = $data ["proxy"];
 			$this->_xls = $data ["xls"];
+			$this->_wdport = $data ["wdport"];
+			$this->_browser = $data ["browser"];
 			switch ($this->_mode) {
 				case "live" :
 					$this->_maxurl = self::LIVE_URL;
@@ -135,8 +144,13 @@ class MAXLive_NCP_DateRangeValue_Update extends PHPUnit_Framework_TestCase {
 	 * Create new class object and initialize session for webdriver
 	 */
 	public function setUp() {
-		self::$driver = new PHPWebDriver_WebDriver ();
-		$this->_session = self::$driver->session ( self::TEST_SESSION );
+		$wd_host = "http://localhost:$this->_wdport/wd/hub";
+		self::$driver = new PHPWebDriver_WebDriver ( $wd_host );
+        $desired_capabilities = array();
+		$proxy = new PHPWebDriver_WebDriverProxy();
+		$proxy->httpProxy = $this->_proxyip;
+        $proxy->add_to_capabilities($desired_capabilities);
+		$this->_session = self::$driver->session ( $this->_browser, $desired_capabilities );
 	}
 	
 	/**
