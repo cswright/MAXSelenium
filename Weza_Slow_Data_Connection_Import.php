@@ -34,14 +34,14 @@ class Weza_Slow_Data_Connection_Import extends PHPUnit_Framework_TestCase {
 	const CUSTOMER = "NCP Chlorochem - Chlorine";
 	const PROVINCE = "Africa -- South Africa -- KZN";
 	const TRUCKTYPE = "Fuel Tanker";
-	const LIVE_URL = "https://login.max.bwtsgroup.com";
-	const TEST_URL = "http://max.mobilize.biz";
-	const INI_FILE = "rates_data.ini";
+	const LIVE_URL = "https://t24.max.bwtsgroup.com";
+	const TEST_URL = "http://t24.mobilize.biz";
+	const INI_FILE = "user_data.ini";
 	const INI_DIR = "ini";
 	const TEST_SESSION = "firefox";
 	const XLS_CREATOR = "Weza_Slow_Data_Connection_Import.php";
 	const XLS_TITLE = "Error Report";
-	const XLS_SUBJECT = "Errors caught while creating rates for subcontracts";
+	const XLS_SUBJECT = "Errors caught creating trips for Weza";
 
 	// : Variables
 	protected static $driver;
@@ -95,7 +95,7 @@ class Weza_Slow_Data_Connection_Import extends PHPUnit_Framework_TestCase {
 			return FALSE;
 		}
 		$data = parse_ini_file ( $ini );
-		if ((array_key_exists ( "xls", $data ) && $data ["xls"]) && (array_key_exists ( "errordir", $data ) && $data ["errordir"]) && (array_key_exists ( "screenshotdir", $data ) && $data ["screenshotdir"]) && (array_key_exists ( "datadir", $data ) && $data ["datadir"]) && (array_key_exists ( "ip", $data ) && $data ["ip"]) && (array_key_exists ( "username", $data ) && $data ["username"]) && (array_key_exists ( "password", $data ) && $data ["password"]) && (array_key_exists ( "welcome", $data ) && $data ["welcome"]) && (array_key_exists ( "mode", $data ) && $data ["mode"])) {
+		if ((array_key_exists ( "browser", $data ) && $data ["browser"]) && (array_key_exists ( "wdport", $data ) && $data ["wdport"]) && (array_key_exists ( "xls", $data ) && $data ["xls"]) && (array_key_exists ( "errordir", $data ) && $data ["errordir"]) && (array_key_exists ( "screenshotdir", $data ) && $data ["screenshotdir"]) && (array_key_exists ( "datadir", $data ) && $data ["datadir"]) && (array_key_exists ( "ip", $data ) && $data ["ip"]) && (array_key_exists ( "username", $data ) && $data ["username"]) && (array_key_exists ( "password", $data ) && $data ["password"]) && (array_key_exists ( "welcome", $data ) && $data ["welcome"]) && (array_key_exists ( "mode", $data ) && $data ["mode"])) {
 			$this->_username = $data ["username"];
 			$this->_password = $data ["password"];
 			$this->_welcome = $data ["welcome"];
@@ -104,6 +104,8 @@ class Weza_Slow_Data_Connection_Import extends PHPUnit_Framework_TestCase {
 			$this->_scrDir = $data ["screenshotdir"];
 			$this->_mode = $data ["mode"];
 			$this->_ip = $data ["ip"];
+			$this->_wdport = $data ["wdport"];
+			$this->_browser = $data ["browser"];
 			$this->_xls = $data ["xls"];
 			switch ($this->_mode) {
 				case "live" :
@@ -133,8 +135,13 @@ class Weza_Slow_Data_Connection_Import extends PHPUnit_Framework_TestCase {
 	 * Create new class object and initialize session for webdriver
 	 */
 	public function setUp() {
-		self::$driver = new PHPWebDriver_WebDriver ();
-		$this->_session = self::$driver->session ( self::TEST_SESSION );
+		$wd_host = "http://localhost:$this->_wdport/wd/hub";
+		self::$driver = new PHPWebDriver_WebDriver ( $wd_host );
+        $desired_capabilities = array();
+		$proxy = new PHPWebDriver_WebDriverProxy();
+		$proxy->httpProxy = $this->_proxyip;
+        $proxy->add_to_capabilities($desired_capabilities);
+		$this->_session = self::$driver->session ( $this->_browser, $desired_capabilities );
 	}
 
 	/**
@@ -142,253 +149,79 @@ class Weza_Slow_Data_Connection_Import extends PHPUnit_Framework_TestCase {
 	 * Pull F and V Contract data and automate creation of F and V Contracts
 	 */
 	public function testCreateContracts() {
-		$_sheetnames = ( array ) array (
-				"Points",
-				"Rates",
-				"Script"
-		);
-		// : Pull data from correctly formatted xls spreadsheet
-		if ($cPR = new RatesReadXLSData ( dirname ( __FILE__ ) . $this->_dataDir . self::DS . $this->_xls, $_sheetnames )) {
-			// Get cities and save in correct naming format standard as per Meryle instruction
-			$cities = $cPR->getCities ();
-			// Get script data settings
-			$settings = $cPR->getSettings ();
-				
-			try {
-				// Initiate Session
-				$session = $this->_session;
-				$this->_session->setPageLoadTimeout ( 60 );
-				$w = new PHPWebDriver_WebDriverWait ( $this->_session );
-
-				// : Extract columns from the spreadsheet data
-				$_xlsColumns = array (
-						"Error_Msg",
-						"Record Detail"
-				);
-
-				// : Setup local variables
-				$_bu = $settings ["BusinessUnit"];
-				$_customer = $settings ["Customer"];
-				$_contrib = $settings ["ContribModel"];
-				$_truckType = $settings ["TruckType"];
-				$_startDate = $settings ["StartDate"];
-				$_endDate = $settings ["EndDate"];
-				$_rateType = $settings ["RateType"];
-
-				// Insert IP address for MySQL Server supplied in rates_data.ini
-				$_mysqlDsn = preg_replace ( "/%s/", $this->_ip, $this->_dbdsn );
-				// Open keepalive connection to database
-				$this->openDB ( $_mysqlDsn, $this->_dbuser, $this->_dbpwd, $this->_dboptions );
-
-				// Get truck description ID
-				$myQuery = "select ID from udo_truckdescription where description='$_truckType';";
-				$result = $this->queryDB ( $myQuery );
-				if (count ( $result ) != 0) {
-					$trucktype_id = $result [0] ["ID"];
-				} else {
-					throw new Exception ( "Error: Truck description not found. Please check and amend truck description." );
-				}
-
-				// Get customer ID
-				$myQuery = "select ID from udo_customer where tradingName='$_customer';";
-				$result = $this->queryDB ( $myQuery );
-				if (count ( $result ) != 0) {
-					$customer_id = $result [0] ["ID"];
-				} else {
-					throw new Exception ( "Error: Customer not found. Please check and amend customer name." );
-				}
-
-				// Get rate type ID
-				$myQuery = "select ID from udo_ratetype where name='$_rateType';";
-				$result = $this->queryDB ( $myQuery );
-				if (count ( $result ) != 0) {
-					$rateType_id = $result [0] ["ID"];
-				} else {
-					throw new Exception ( "Error: Rate type not found. Please check and amend rate type name." );
-				}
-
-				// Get business unit ID
-				$myQuery = "select ID from udo_businessunit where name='$_bu';";
-				$result = $this->queryDB ( $myQuery );
-				if (count ( $result ) != 0) {
-					$bunit_id = $result [0] ["ID"];
-				} else {
-					throw new Exception ( "Error: Business unit not found. Please check and amend business unit name." );
-				}
-
-				// Get objectregistry_id for udo_Customer
-				$myQuery = $this->_myqueries [4];
-				$result = $this->queryDB ( $myQuery );
-				if (count ( $result ) != 0) {
-					$objectregistry_id = $result [0] ["ID"];
-				} else {
-					throw new Exception ( "Error: Object registry record for udo_customer not found." );
-				}
-				// : End
-			} catch ( Exception $e ) {
-				// Print error message
-				print ($e->getMessage () . PHP_EOL) ;
-				// Terminate application
-				die ();
-			}
-				
-			// : Login
-			try {
-				$this->_session->open ( $this->_maxurl );
-				// : Wait for page to load and for elements to be present on page
-				if ($this->_mode == "live") {
-					$e = $w->until ( function ($session) {
-						return $session->element ( 'css selector', "#contentFrame" );
-					} );
-					$iframe = $this->_session->element ( 'css selector', '#contentFrame' );
-					$this->_session->switch_to_frame ( $iframe );
-				}
+		// Initiate Session
+		$session = $this->_session;
+		$this->_session->setPageLoadTimeout ( 60 );
+		$w = new PHPWebDriver_WebDriverWait ( $this->_session );
+		
+		// Construct an array with the customer names to use with script
+		$rate_id = ( string ) "";
+		
+		// Connect to database
+		$_mysqlDsn = preg_replace ( "/%s/", $this->_ip, $this->_dbdsn );
+		$this->openDB ( $_mysqlDsn, $this->_dbuser, $this->_dbpwd, $this->_dboptions );
+		
+		// : Query and save objectregistry_id for udo_subcontractor
+		$myQuery = $this->_myqueries [5];
+		$result = $this->queryDB ( $myQuery );
+		$objectregistry_id = $result [0] ["ID"];
+		// : End
+		
+		// : Login
+		try {
+			$this->_session->open ( $this->_maxurl );
+			// : Wait for page to load and for elements to be present on page
+			if ($this->_mode == "live") {
 				$e = $w->until ( function ($session) {
-					return $session->element ( 'css selector', 'input[id=identification]' );
+					return $session->element ( 'css selector', "#contentFrame" );
 				} );
-				// : End
-				$this->assertElementPresent ( 'css selector', 'input[id=identification]' );
-				$this->assertElementPresent ( 'css selector', 'input[id=password]' );
-				$this->assertElementPresent ( 'css selector', 'input[name=submit][type=submit]' );
-				$e->sendKeys ( $this->_username );
-				$e = $this->_session->element ( 'css selector', 'input[id=password]' );
-				$e->sendKeys ( $this->_password );
-				$e = $this->_session->element ( 'css selector', 'input[name=submit][type=submit]' );
-				$e->click ();
-				// Switch out of frame
-				if ($this->_mode == "live") {
-					$this->_session->switch_to_frame ();
-				}
-
-				// : Wait for page to load and for elements to be present on page
-				if ($this->_mode == "live") {
-					$e = $w->until ( function ($session) {
-						return $session->element ( 'css selector', "#contentFrame" );
-					} );
-					$iframe = $this->_session->element ( 'css selector', '#contentFrame' );
-					$this->_session->switch_to_frame ( $iframe );
-				}
-				$e = $w->until ( function ($session) {
-					return $session->element ( "xpath", "//*[text()='" . $this->_welcome . "']" );
-				} );
-				$this->assertElementPresent ( "xpath", "//*[text()='" . $this->_welcome . "']" );
-				// Switch out of frame
-				if ($this->_mode == "live") {
-					$this->_session->switch_to_frame ();
-				}
-			} catch ( Exception $e ) {
-				throw new Exception ( "Error: Failed to log into MAX." . PHP_EOL . $e->getMessage () );
+				$iframe = $this->_session->element ( 'css selector', '#contentFrame' );
+				$this->_session->switch_to_frame ( $iframe );
 			}
-			// : End
-				
-			// : Load Planningboard to rid of iframe loading on every page from here on
-			$this->_session->open ( $this->_maxurl . self::PB_URL );
 			$e = $w->until ( function ($session) {
-				return $session->element ( "xpath", "//*[contains(text(),'You Are Here') and contains(text(), 'Planningboard')]" );
+				return $session->element ( 'css selector', 'input[id=identification]' );
 			} );
 			// : End
-					
-				// : Create Routes, Rates and Rate Values
-				foreach ( $cities as $pointname ) {
-					try {
-						$this->lastRecord = $pointname;
-						// : Get kms zone for this entry
-						$kms = preg_split ( "/kms Zone.*/", $pointname );
-						$kms = $kms [0];
-						// : End
-							
-						// Correct hyphen conversion issue with spreadsheets
-						$pointname = preg_replace ( "/–/", "-", $pointname );
-							
-						// : Create Rate Value for Route
-						$myQuery = preg_replace ( "/%t/", $pointname, $this->_myqueries [3] );
-						$myQuery = preg_replace ( "/%g/", $objectregistry_id, $myQuery );
-						$myQuery = preg_replace ( "/%c/", $customer_id, $myQuery );
-						$myQuery = preg_replace ( "/%d/", $trucktype_id, $myQuery );
-						$myQuery = preg_replace ( "/%m/", $_contrib, $myQuery );
-						$myQuery = preg_replace ( "/%b/", $bunit_id, $myQuery );
-						$myQuery = preg_replace ( "/%r/", $rateType_id, $myQuery );
-						$result = $this->queryDB ( $myQuery );
-						if (count ( $result ) != 0) {
-							foreach ( $result as $_rateRecord ) {
-								$rate_id = $_rateRecord ["ID"];
-								$rateurl = preg_replace ( "/%s/", $rate_id, $this->_maxurl . self::RATEVAL_URL );
-								$this->_session->open ( $rateurl );
-									
-								// Wait for element = #button-create
-								$e = $w->until ( function ($session) {
-									return $session->element ( "css selector", "#button-create" );
-								} );
-								// Click element - #button-create
-								$this->_session->element ( "css selector", "#button-create" )->click ();
-									
-								// Wait for element = #button-create
-								$e = $w->until ( function ($session) {
-									return $session->element ( "xpath", "//*[contains(text(),'Create Date Range Values')]" );
-								} );
-										
-									$this->assertElementPresent ( "xpath", "//*[@id='DateRangeValue-2_0_0_beginDate-2']" );
-									$this->assertElementPresent ( "xpath", "//*[@id='DateRangeValue-4_0_0_endDate-4']" );
-									$this->assertElementPresent ( "xpath", "//*[@id='DateRangeValue-20_0_0_value-20']" );
-									$this->assertElementPresent ( "css selector", "input[type=submit][name=save]" );
-										
-									// Clear the begin date text field
-									$this->_session->element ( "xpath", "//*[@id='DateRangeValue-2_0_0_beginDate-2']" )->clear ();
-									// Paste startDate into begin date field
-									$this->_session->element ( "xpath", "//*[@id='DateRangeValue-2_0_0_beginDate-2']" )->sendKeys ( $_startDate );
-									// Clear the end date text field
-									$this->_session->element ( "xpath", "//*[@id='DateRangeValue-4_0_0_endDate-4']" )->clear ();
-									// Paste endDate into end date field
-									$this->_session->element ( "xpath", "//*[@id='DateRangeValue-4_0_0_endDate-4']" )->sendKeys ( $_endDate );
-									// Get the product name out the string
-									$productname = preg_split ( "/^" . $kms . "kms Zone /", $pointname );
-									// Format the string of the rate value xxx.xx
-									$ratevalue = strval ( (number_format ( floatval ( $routes [$kms] [$productname [1]] ), 2, ".", "" )) );
-									// Paste the formatted rate value into the value field
-									$this->_session->element ( "xpath", "//*[@id='DateRangeValue-20_0_0_value-20']" )->sendKeys ( $ratevalue );
-									// Click element - submit button
-									$this->_session->element ( "css selector", "input[type=submit][name=save]" )->click ();
-							}
-						} else {
-							throw new Exception ( "Error: Rate id record not found." );
-						}
-					} catch ( Exception $e ) {
-						echo "Error: " . $e->getMessage () . PHP_EOL;
-						echo "Time of error: " . date ( "Y-m-d H:i:s" ) . PHP_EOL;
-						echo "Last record: " . $this->lastRecord;
-						$this->takeScreenshot ();
-						$_erCount = count ( $this->_error );
-						$this->_error [$_erCount + 1] ["error"] = $e->getMessage ();
-						$this->_error [$_erCount + 1] ["record"] = $this->lastRecord;
-					}
-				}
-				// : End
-				// : End
-					
-				// : Tear Down
-				$this->_session->element ( 'xpath', "//*[contains(@href,'/logout')]" )->click ();
-				// Wait for page to load and for elements to be present on page
+			$this->assertElementPresent ( 'css selector', 'input[id=identification]' );
+			$this->assertElementPresent ( 'css selector', 'input[id=password]' );
+			$this->assertElementPresent ( 'css selector', 'input[name=submit][type=submit]' );
+			$e->sendKeys ( $this->_username );
+			$e = $this->_session->element ( 'css selector', 'input[id=password]' );
+			$e->sendKeys ( $this->_password );
+			$e = $this->_session->element ( 'css selector', 'input[name=submit][type=submit]' );
+			$e->click ();
+			// Switch out of frame
+			if ($this->_mode == "live") {
+				$this->_session->switch_to_frame ();
+			}
+				
+			// : Wait for page to load and for elements to be present on page
+			if ($this->_mode == "live") {
 				$e = $w->until ( function ($session) {
-					return $session->element ( 'css selector', 'input[id=identification]' );
+					return $session->element ( 'css selector', "#contentFrame" );
 				} );
-				$this->assertElementPresent ( 'css selector', 'input[id=identification]' );
-				$db = null;
-				$this->_session->close ();
-				// : End
-				// : If errors occured. Create xls of entries that failed.
-				if (count ( $this->_error ) != 0) {
-					$_xlsfilename = (dirname ( __FILE__ ) . $this->_errDir . self::DS . date ( "Y-m-d_His_" ) . "MAXLiveNCP_" . ".xlsx");
-					$this->writeExcelFile ( $_xlsfilename, $this->_error, $_xlsColumns );
-					if (file_exists ( $_xlsfilename )) {
-						print ("Excel error report written successfully to file: $_xlsfilename") ;
-					} else {
-						print ("Excel error report write unsuccessful") ;
-					}
-				}
-				// : End
-		} else {
-			print ("Error: The excel spreadsheet, '" . $this->_xls . "', failed to load." . PHP_EOL) ;
+				$iframe = $this->_session->element ( 'css selector', '#contentFrame' );
+				$this->_session->switch_to_frame ( $iframe );
+			}
+			$e = $w->until ( function ($session) {
+				return $session->element ( "xpath", "//*[text()='" . $this->_welcome . "']" );
+			} );
+			$this->assertElementPresent ( "xpath", "//*[text()='" . $this->_welcome . "']" );
+			// Switch out of frame
+			if ($this->_mode == "live") {
+				$this->_session->switch_to_frame ();
+			}
+		} catch ( Exception $e ) {
+			throw new Exception ("Something went wrong when attempting to log into MAX, see error message below." . PHP_EOL . $e->getMessage());
 		}
+		// : End
+		
+		// : Load Planningboard to rid of iframe loading on every page from here on
+		$this->_session->open ( $this->_maxurl . self::PB_URL );
+		$e = $w->until ( function ($session) {
+			return $session->element ( "xpath", "//*[contains(text(),'You Are Here') and contains(text(), 'Planningboard')]" );
+		} );
+		// : End
 	}
 
 	// : Private Functions
