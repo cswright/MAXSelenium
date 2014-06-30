@@ -270,6 +270,7 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 					$e = $w->until ( function ($session) {
 						return $session->element ( 'css selector', '#udo_FandVContract-2__0_businessUnit_id-2' );
 					} );
+
 					$this->assertElementPresent ( "xpath", "//*[contains(text(),'Create F and V Contracts')]" );
 					$this->assertElementPresent ( "xpath", "//*[contains(text(),'" . $value ["Customer"] . "')]" );
 					$this->assertElementPresent ( 'css selector', '#udo_FandVContract-2__0_businessUnit_id-2' );
@@ -277,9 +278,9 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 					$this->assertElementPresent ( 'css selector', '#udo_FandVContract-7_0_0_endDate-7' );
 					$this->assertElementPresent ( 'css selector', '#udo_FandVContract-8_0_0_fixedContribution-8' );
 					$this->assertElementPresent ( 'css selector', '#udo_FandVContract-9_0_0_fixedCost-9' );
-					$this->assertElementPresent ( 'css selector', '#udo_FandVContract-26__0_truckDescription_id-26' );
-					$this->assertElementPresent ( 'css selector', '#udo_FandVContract-28_0_0_variableCost-28' );
-					$this->assertElementPresent ( 'css selector', '#udo_FandVContract-27__0_rateType_id-27' );
+					$this->assertElementPresent ( 'css selector', '#udo_FandVContract-28__0_truckDescription_id-28' );
+					$this->assertElementPresent ( 'css selector', '#udo_FandVContract-30_0_0_variableCost-30' );
+					$this->assertElementPresent ( 'css selector', '#udo_FandVContract-29__0_rateType_id-29' );
 					$this->assertElementPresent ( 'css selector', '#udo_FandVContract-4_0_0_creditPercentage-4' );
 					$this->assertElementPresent ( 'css selector', '#udo_FandVContract-13_0_0_numberOfDays-13' );
 					$this->assertElementPresent ( 'css selector', 'input[name=save][type=submit]' );
@@ -293,16 +294,16 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 					$this->_session->element ( 'css selector', '#udo_FandVContract-8_0_0_fixedContribution-8' )->sendKeys ( strval ( number_format ( floatval ( $value ['Contrib'] ), 2, '.', '' ) ) );
 					$this->_session->element ( 'css selector', '#udo_FandVContract-9_0_0_fixedCost-9' )->clear ();
 					$this->_session->element ( 'css selector', '#udo_FandVContract-9_0_0_fixedCost-9' )->sendKeys ( strval ( number_format ( floatval ( $value ['Cost'] ), 2, '.', '' ) ) );
-					$this->_session->element ( "xpath", "//*[@id='udo_FandVContract-26__0_truckDescription_id-26']/option[text()='" . $value ["Truck Type"] . "']" )->click ();
-					$this->_session->element ( 'css selector', '#udo_FandVContract-28_0_0_variableCost-28' )->clear ();
-					$this->_session->element ( 'css selector', '#udo_FandVContract-28_0_0_variableCost-28' )->sendKeys ( strval ( $value ['Rate'] ) );
-					$this->_session->element ( "xpath", "//*[@id='udo_FandVContract-27__0_rateType_id-27']/option[text()='" . $value ["RateType"] . "']" )->click ();
+					$this->_session->element ( "xpath", "//*[@id='udo_FandVContract-28__0_truckDescription_id-28']/option[text()='" . $value ["Truck Type"] . "']" )->click ();
+					$this->_session->element ( 'css selector', '#udo_FandVContract-30_0_0_variableCost-30' )->clear ();
+					$this->_session->element ( 'css selector', '#udo_FandVContract-30_0_0_variableCost-30' )->sendKeys ( strval ( $value ['Rate'] ) );
+					$this->_session->element ( "xpath", "//*[@id='udo_FandVContract-29__0_rateType_id-29']/option[text()='" . $value ["RateType"] . "']" )->click ();
 					$this->_session->element ( 'css selector', '#udo_FandVContract-4_0_0_creditPercentage-4' )->clear ();
 					$this->_session->element ( 'css selector', '#udo_FandVContract-4_0_0_creditPercentage-4' )->sendKeys ( "0.00" );
 					$this->_session->element ( 'css selector', '#udo_FandVContract-13_0_0_numberOfDays-13' )->clear ();
 					$this->_session->element ( 'css selector', '#udo_FandVContract-13_0_0_numberOfDays-13' )->sendKeys ( strval ( $value ["Days"] ) );
 					$this->_session->element ( 'css selector', 'input[name=save][type=submit]' )->click ();
-					
+
 					$startDate = $value ["Start Date"];
 					$endDate = $value ["End Date"];
 					$startDate = date ( "Y-m-d H:i:s", strtotime ( "-2 hours", strtotime ( $startDate ) ) );
@@ -652,7 +653,7 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 			}
 			// : If errors occured. Create xls of entries that failed.
 			if (count ( $this->_error ) != 0) {
-				$_xlsfilename = (dirname ( __FILE__ ) . $this->_errDir . self::DS . date ( "Y-m-d_His_" ) . "_MAXLiveFandV.xlsx");
+				$_xlsfilename = (dirname ( __FILE__ ) . $this->_errDir . self::DS . date ( "Y-m-d_His_" ) . $this->_wdport . "_MAXLiveFandV.xlsx");
 				$this->writeExcelFile ( $_xlsfilename, $this->_error, $_xlsColumns );
 				if (file_exists ( $_xlsfilename )) {
 					print ("Excel error report written successfully to file: $_xlsfilename") ;
