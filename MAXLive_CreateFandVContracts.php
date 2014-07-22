@@ -11,6 +11,7 @@ ini_set('display_errors','0');
 include_once ('PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriver.php');
 include_once ('PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriverWait.php');
 include_once ('PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriverBy.php');
+include_once ('PHPUnit/Extensions/php-webdriver/PHPWebDriver/WebDriverProxy.php');
 include_once dirname ( __FILE__ ) . '/FandVReadXLSData.php';
 include_once 'PHPUnit/Extensions/PHPExcel/Classes/PHPExcel.php';
 /**
@@ -69,6 +70,7 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 	protected $_welcome;
 	protected $_xls;
 	protected $_ip;
+	protected $_proxyip;
 	protected $_data;
 	protected $_dataDir;
 	protected $_errDir;
@@ -102,7 +104,7 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 			return FALSE;
 		}
 		$data = parse_ini_file ( $ini );
-		if ((array_key_exists ( "browser", $data ) && $data ["browser"]) && (array_key_exists ( "ip", $data ) && $data ["ip"]) && (array_key_exists ( "datadir", $data ) && $data ["datadir"]) && (array_key_exists ( "username", $data ) && $data ["username"]) && (array_key_exists ( "xls", $data ) && $data ["xls"]) && (array_key_exists ( "password", $data ) && $data ["password"]) && (array_key_exists ( "welcome", $data ) && $data ["welcome"]) && (array_key_exists ( "mode", $data ) && $data ["mode"])) {
+		if ((array_key_exists ( "proxy", $data ) && $data ["proxy"]) && (array_key_exists ( "browser", $data ) && $data ["browser"]) && (array_key_exists ( "ip", $data ) && $data ["ip"]) && (array_key_exists ( "datadir", $data ) && $data ["datadir"]) && (array_key_exists ( "username", $data ) && $data ["username"]) && (array_key_exists ( "xls", $data ) && $data ["xls"]) && (array_key_exists ( "password", $data ) && $data ["password"]) && (array_key_exists ( "welcome", $data ) && $data ["welcome"]) && (array_key_exists ( "mode", $data ) && $data ["mode"])) {
 			$this->_username = $data ["username"];
 			$this->_password = $data ["password"];
 			$this->_welcome = $data ["welcome"];
@@ -111,6 +113,7 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 			$this->_scrDir = $data ["screenshotdir"];
 			$this->_xls = $data ["xls"];
 			$this->_ip = $data ["ip"];
+			$this->_proxyip = $data ["proxy"];
 			$this->_wdport = $data ["wdport"];
 			$this->_browser = $data ["browser"];
 			$this->_mode = $data ["mode"];
@@ -122,7 +125,7 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 					$this->_maxurl = self::TEST_URL;
 			}
 		} else {
-			echo "The correct data is not present in $ini. Please confirm. Fields are username, password, welcome, mode, dataDir and xls are present in the file." . PHP_EOL;
+			echo "The correct data is not present in $ini. Please confirm the following fields are present in the file: username, password, welcome, mode, dataDir, ip, proxy, browser and xls." . PHP_EOL;
 			return FALSE;
 		}
 	}
@@ -144,7 +147,11 @@ class MAXLive_CreateFandVContracts extends PHPUnit_Framework_TestCase {
 	public function setUp() {
 		$wd_host = "http://localhost:$this->_wdport/wd/hub";
 		self::$driver = new PHPWebDriver_WebDriver ( $wd_host );
-		$this->_session = self::$driver->session ( self::TEST_SESSION );
+		$desired_capabilities = array();
+		$proxy = new PHPWebDriver_WebDriverProxy();
+		$proxy->httpProxy = $this->_proxyip;
+		$proxy->add_to_capabilities($desired_capabilities);
+		$this->_session = self::$driver->session ( $this->_browser, $desired_capabilities );
 	}
 	
 	/**
